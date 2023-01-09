@@ -118,7 +118,6 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 				},
 			},
 			[
-				m(".small.flex.flex-wrap.items-start", [this.tutaoBadge(viewModel), m("span.text-break", getSenderHeading(viewModel.mail, false))]),
 				m(".flex", [
 					this.getRecipientEmailAddress(attrs),
 					m(".flex-grow"),
@@ -152,7 +151,11 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 	}
 
 	private renderSubjectActionsLine(viewModel: MailViewerViewModel, attrs: MailViewerHeaderAttrs) {
-		return m(".flex.items-start", [this.renderSubject(viewModel), this.actionButtons(attrs)])
+		return m(".flex.items-start.pl-l", [
+			// this.renderSubject(viewModel),
+			m(".flex.flex-wrap.items-start.mt", [this.tutaoBadge(viewModel), m("span.text-break", getSenderHeading(viewModel.mail, false))]),
+			this.actionButtons(attrs)
+		])
 	}
 
 	private renderSubject(viewModel: MailViewerViewModel) {

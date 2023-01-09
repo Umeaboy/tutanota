@@ -5,7 +5,7 @@ import { windowFacade, windowSizeListener } from "../../misc/WindowFacade"
 import { FeatureType, InboxRuleType, Keys, MailFolderType, SpamRuleFieldType, SpamRuleType } from "../../api/common/TutanotaConstants"
 import type { Mail } from "../../api/entities/tutanota/TypeRefs.js"
 import { lang } from "../../misc/LanguageViewModel"
-import { assertMainOrNode, isDesktop } from "../../api/common/Env"
+import { assertMainOrNode } from "../../api/common/Env"
 import { assertNonNull, defer, DeferredObject, neverNull, noOp, ofClass } from "@tutao/tutanota-utils"
 import { createNewContact, getExistingRuleForType, isTutanotaTeamMail } from "../model/MailUtils"
 import ColumnEmptyMessageBox from "../../gui/base/ColumnEmptyMessageBox"
@@ -21,7 +21,6 @@ import { DropdownButtonAttrs, showDropdownAtPosition } from "../../gui/base/Drop
 import { navButtonRoutes } from "../../misc/RouteChange"
 import type { InlineImageReference } from "./MailGuiUtils"
 import { replaceCidsWithInlineImages } from "./MailGuiUtils"
-import { locator } from "../../api/main/MainLocator"
 import { getCoordsOfMouseOrTouchEvent } from "../../gui/base/GuiUtils"
 import { copyToClipboard } from "../../misc/ClipboardUtils"
 import { ContentBlockingStatus, MailViewerViewModel } from "./MailViewerViewModel"
@@ -35,6 +34,7 @@ import { isNewMailActionAvailable } from "../../gui/nav/NavFunctions"
 import { CancelledError } from "../../api/common/error/CancelledError"
 import { MailViewerHeader } from "./MailViewerHeader.js"
 import { editDraft, showHeaderDialog } from "./MailViewerUtils.js"
+import { Button, ButtonType } from "../../gui/base/Button.js"
 
 assertMainOrNode()
 // map of inline image cid to InlineImageReference
@@ -50,6 +50,7 @@ type MailAddressAndName = {
 
 export type MailViewerAttrs = {
 	viewModel: MailViewerViewModel
+	isPrimary: boolean
 }
 
 /**
@@ -95,7 +96,7 @@ export class MailViewer implements Component<MailViewerAttrs> {
 	private loadAllListener = stream()
 
 	constructor(vnode: Vnode<MailViewerAttrs>) {
-		this.setViewModel(vnode.attrs.viewModel)
+		this.setViewModel(vnode.attrs.viewModel, vnode.attrs.isPrimary)
 
 		this.resizeListener = () => this.domBodyDeferred.promise.then((dom) => this.updateLineHeight(dom))
 
@@ -113,7 +114,7 @@ export class MailViewer implements Component<MailViewerAttrs> {
 		keyManager.unregisterShortcuts(this.shortcuts)
 	}
 
-	private setViewModel(viewModel: MailViewerViewModel) {
+	private setViewModel(viewModel: MailViewerViewModel, isPrimary: boolean) {
 		// Figuring out whether we have a new email assigned.
 		const oldViewModel = this.viewModel
 		this.viewModel = viewModel
@@ -133,8 +134,9 @@ export class MailViewer implements Component<MailViewerAttrs> {
 			// Reset scaling status if it's a new email.
 			this.isScaling = true
 			this.lastContentBlockingStatus = null
-			this.viewModel.loadAll()
-
+			if (isPrimary) {
+				this.viewModel.loadAll()
+			}
 			this.delayProgressSpinner = true
 			setTimeout(() => {
 				this.delayProgressSpinner = false
@@ -145,21 +147,17 @@ export class MailViewer implements Component<MailViewerAttrs> {
 
 	view(vnode: Vnode<MailViewerAttrs>): Children {
 		this.handleContentBlockingOnRender()
-
-		const scrollingHeader = styles.isSingleColumnLayout()
 		return [
-			m("#mail-viewer.fill-absolute" + (scrollingHeader ? ".scroll-no-overlay.overflow-x-hidden" : ".flex.flex-column"), [
+			m(".mail-viewer" + ".scroll-no-overlay.overflow-x-hidden", [
 				this.renderMailHeader(),
 				m(
-					".flex-grow.mlr-safe-inset.scroll-x.plr-l.pb-floating.pt" +
-						(scrollingHeader ? "" : ".scroll-no-overlay") +
-						(this.viewModel.isContrastFixNeeded() ? ".bg-white.content-black" : " "),
+					".flex-grow.mlr-safe-inset.scroll-x.plr-l.pt" + (this.viewModel.isContrastFixNeeded() ? ".bg-white.content-black" : " "),
 					{
 						oncreate: (vnode) => {
 							this.scrollDom = vnode.dom as HTMLElement
 						},
 					},
-					this.renderMailBodySection(),
+					this.renderMailBodySection(vnode.attrs.isPrimary),
 				),
 			]),
 		]
@@ -187,14 +185,14 @@ export class MailViewer implements Component<MailViewerAttrs> {
 	onbeforeupdate(vnode: Vnode<MailViewerAttrs>): boolean | void {
 		// Setting viewModel here to have viewModel that we will use for render already and be able to make a decision
 		// about skipping rendering
-		this.setViewModel(vnode.attrs.viewModel)
+		this.setViewModel(vnode.attrs.viewModel, vnode.attrs.isPrimary)
 		// We skip rendering progress indicator when switching between emails.
 		// However if we already loaded the mail then we can just render it.
 		const shouldSkipRender = this.viewModel.isLoading() && this.delayProgressSpinner
 		return !shouldSkipRender
 	}
 
-	private renderMailBodySection(): Children {
+	private renderMailBodySection(isPrimary: boolean): Children {
 		if (this.viewModel.didErrorsOccur()) {
 			return m(ColumnEmptyMessageBox, {
 				message: "corrupted_msg",
@@ -212,6 +210,12 @@ export class MailViewer implements Component<MailViewerAttrs> {
 			return this.renderMailBody(sanitizedMailBody)
 		} else if (this.viewModel.isLoading()) {
 			return this.renderLoadingIcon()
+		} else if (!isPrimary) {
+			return m(".center", m(Button, {
+				type: ButtonType.Secondary,
+				label: "loadMore_action",
+				click: () => this.viewModel.loadAll(),
+			}))
 		} else {
 			// The body failed to load, just show blank body because there is a banner
 			return null

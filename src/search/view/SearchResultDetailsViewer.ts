@@ -71,6 +71,7 @@ export class SearchResultDetailsViewer {
 			return viewer?.mode === "mail"
 				? m(MailViewer, {
 						viewModel: viewer.viewModel,
+					isPrimary: true
 				  })
 				: viewer != null
 				? m(viewer.viewer)
