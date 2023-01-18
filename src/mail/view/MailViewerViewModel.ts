@@ -1025,6 +1025,10 @@ export class MailViewerViewModel {
 		return this.renderIsDelayed
 	}
 
+	isCollapsed(): boolean {
+		return this.getSanitizedMailBody() == null && !this.isLoading() && !this.isConnectionLost()
+	}
+
 	async getAssignmentGroupInfos(): Promise<GroupInfo[]> {
 		// remove the current mailbox/owner from the recipients list.
 		const userOrMailGroupInfos = await this.getAssignableMailRecipients()

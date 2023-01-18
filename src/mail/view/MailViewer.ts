@@ -34,7 +34,6 @@ import { isNewMailActionAvailable } from "../../gui/nav/NavFunctions"
 import { CancelledError } from "../../api/common/error/CancelledError"
 import { MailViewerHeader } from "./MailViewerHeader.js"
 import { editDraft, showHeaderDialog } from "./MailViewerUtils.js"
-import { Button, ButtonType } from "../../gui/base/Button.js"
 
 assertMainOrNode()
 // map of inline image cid to InlineImageReference
@@ -149,7 +148,7 @@ export class MailViewer implements Component<MailViewerAttrs> {
 		this.handleContentBlockingOnRender()
 		return [
 			m(".mail-viewer" + ".scroll-no-overlay.overflow-x-hidden", [
-				this.renderMailHeader(),
+				this.renderMailHeader(vnode.attrs),
 				m(
 					".flex-grow.mlr-safe-inset.scroll-x.plr-l.pt" + (this.viewModel.isContrastFixNeeded() ? ".bg-white.content-black" : " "),
 					{
@@ -157,7 +156,7 @@ export class MailViewer implements Component<MailViewerAttrs> {
 							this.scrollDom = vnode.dom as HTMLElement
 						},
 					},
-					this.renderMailBodySection(vnode.attrs.isPrimary),
+					vnode.attrs.viewModel.isCollapsed() ? null : this.renderMailBodySection(vnode.attrs.isPrimary),
 				),
 			]),
 		]
@@ -175,10 +174,11 @@ export class MailViewer implements Component<MailViewerAttrs> {
 		this.lastContentBlockingStatus = this.viewModel.getContentBlockingStatus()
 	}
 
-	private renderMailHeader() {
+	private renderMailHeader(attrs: MailViewerAttrs) {
 		return m(MailViewerHeader, {
 			viewModel: this.viewModel,
 			createMailAddressContextButtons: this.createMailAddressContextButtons.bind(this),
+			isPrimary: attrs.isPrimary,
 		})
 	}
 
@@ -211,11 +211,7 @@ export class MailViewer implements Component<MailViewerAttrs> {
 		} else if (this.viewModel.isLoading()) {
 			return this.renderLoadingIcon()
 		} else if (!isPrimary) {
-			return m(".center", m(Button, {
-				type: ButtonType.Secondary,
-				label: "loadMore_action",
-				click: () => this.viewModel.loadAll(),
-			}))
+			return null
 		} else {
 			// The body failed to load, just show blank body because there is a banner
 			return null

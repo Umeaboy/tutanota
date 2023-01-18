@@ -168,6 +168,9 @@ styles.registerStyle("main", () => {
 		".b": {
 			"font-weight": "bold",
 		},
+		".font-weight-600": {
+			"font-weight": "600",
+		},
 		".i": {
 			"font-style": "italic",
 		},

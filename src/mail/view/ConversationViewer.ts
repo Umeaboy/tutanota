@@ -5,7 +5,8 @@ import { lang } from "../../misc/LanguageViewModel.js"
 import { theme } from "../../gui/theme.js"
 import { Button, ButtonType } from "../../gui/base/Button.js"
 import { noOp } from "@tutao/tutanota-utils"
-import {getElementId, isSameId} from "../../api/common/utils/EntityUtils.js"
+import { getElementId, isSameId } from "../../api/common/utils/EntityUtils.js"
+import { MiniMailViewer } from "./MiniMailViewer.js"
 
 export interface ConversationViewerAttrs {
 	viewModel: ConversationViewModel
@@ -57,7 +58,7 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 
 			itemsWithHeaders.push(
 				m(
-					".plr.pb.mlr-l.mt.border-radius",
+					".plr.mlr-l.border-radius" + (itemsWithHeaders.length ? ".mt-m" : ""),
 					{
 						key: getElementId(mailViewModel.mail),
 						oncreate: (vnode: VnodeDOM) => {
@@ -73,17 +74,19 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 							}
 						},
 						style: {
-							border: `2px solid ${isPrimary ? theme.content_accent : theme.content_border}`,
-							backgroundColor:
-								mailViewModel.getSanitizedMailBody() == null && !mailViewModel.isLoading() && !mailViewModel.isConnectionLost()
-									? theme.navigation_bg
-									: undefined,
+							border: `1px solid ${theme.list_border}`,
+							backgroundColor: theme.content_bg,
 						},
 					},
-					m(MailViewer, {
-						viewModel: mailViewModel,
-						isPrimary: isPrimary,
-					}),
+					// probably should trigger the load from somewhere here but currently we need to render mail viewer for that to happen
+					!isPrimary && mailViewModel.isCollapsed()
+						? m(MiniMailViewer, {
+								viewModel: mailViewModel,
+						  })
+						: m(MailViewer, {
+								viewModel: mailViewModel,
+								isPrimary: isPrimary,
+						  }),
 				),
 			)
 		}
@@ -92,6 +95,9 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 		return m(
 			".fill-absolute.scroll",
 			{
+				style: {
+					backgroundColor: theme.navigation_bg,
+				},
 				oncreate: (vnode) => {
 					console.log("create container")
 					this.containerDom = vnode.dom
@@ -99,7 +105,7 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 				},
 				onremove: () => {
 					console.log("remove container")
-				}
+				},
 			},
 			itemsWithHeaders,
 		)
@@ -112,7 +118,7 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 			// we say that we *did* scroll even if it would be too early (primaryDom is not attached?)
 			// but why is it not attached if it's already next frame?
 
-			this.didScroll = {mail: viewModel.mail._id}
+			this.didScroll = { mail: viewModel.mail._id }
 			const stack = new Error().stack
 			requestAnimationFrame(() => {
 				console.log("scrolling to", primaryDom.offsetTop, primaryDom.parentNode, stack)

@@ -45,6 +45,7 @@ export interface MailViewerHeaderAttrs {
 	// If we want to reuse this view we should probably pass everything on its own.
 	viewModel: MailViewerViewModel
 	createMailAddressContextButtons: MailAddressDropdownCreator
+	isPrimary: boolean
 }
 
 /** The upper part of the mail viewer, everything but the mail body itself. */
@@ -154,7 +155,7 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 		return m(".flex.items-start.pl-l", [
 			// this.renderSubject(viewModel),
 			m(".flex.flex-wrap.items-start.mt", [this.tutaoBadge(viewModel), m("span.text-break", getSenderHeading(viewModel.mail, false))]),
-			this.actionButtons(attrs)
+			this.actionButtons(attrs),
 		])
 	}
 
@@ -171,6 +172,7 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 
 	private renderBanners(attrs: MailViewerHeaderAttrs): Children {
 		const { viewModel } = attrs
+		if (viewModel.isCollapsed()) return null
 		return [
 			this.renderPhishingWarning(viewModel) || this.renderHardAuthenticationFailWarning(viewModel) || this.renderSoftAuthenticationFailWarning(viewModel),
 			this.renderExternalContentBanner(attrs),
@@ -616,7 +618,12 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 	private actionButtons(attrs: MailViewerHeaderAttrs): Children {
 		const { viewModel } = attrs
 		let actions: Children
-		if (viewModel.isAnnouncement()) {
+		if (!attrs.isPrimary) {
+			actions = [
+				// FIXME: all actions there
+				this.moreButton(attrs),
+			]
+		} else if (viewModel.isAnnouncement()) {
 			actions = [this.deleteButton(attrs), this.moreButton(attrs)]
 		} else if (viewModel.isDraftMail()) {
 			actions = [this.deleteButton(attrs), this.moveButton(attrs), this.editButton(attrs)]
@@ -762,7 +769,7 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 							icon: BootIcons.Expand,
 							container: "div",
 							style: {
-								fill: theme.content_fg,
+								fill: viewModel.isCollapsed() ? theme.content_button : theme.content_fg,
 								transform: this.detailsExpanded ? "rotate(180deg)" : "",
 							},
 						}),
