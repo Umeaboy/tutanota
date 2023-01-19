@@ -769,9 +769,21 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 		})
 	}
 
-	private prepareMoreActions({ viewModel }: MailViewerHeaderAttrs) {
+	private prepareMoreActions({ viewModel, isPrimary }: MailViewerHeaderAttrs) {
 		return createDropdown({
-			lazyButtons: () => mailViewerMoreActions(viewModel),
+			lazyButtons: () => [
+				// FIXME temporary hack, should actually add them in utils conditionally
+				...(isPrimary
+					? []
+					: [
+							{
+								label: "delete_action",
+								click: () => promptAndDeleteMails(viewModel.mailModel, [viewModel.mail], noOp),
+								icon: Icons.Trash,
+							} as DropdownButtonAttrs,
+					  ]),
+				...mailViewerMoreActions(viewModel),
+			],
 			width: 300,
 		})
 	}

@@ -147,10 +147,10 @@ export class MailViewer implements Component<MailViewerAttrs> {
 	view(vnode: Vnode<MailViewerAttrs>): Children {
 		this.handleContentBlockingOnRender()
 		return [
-			m(".mail-viewer" + ".scroll-no-overlay.overflow-x-hidden", [
+			m(".mail-viewer" + ".overflow-x-hidden", [
 				this.renderMailHeader(vnode.attrs),
 				m(
-					".flex-grow.mlr-safe-inset.scroll-x.pt" + (this.viewModel.isContrastFixNeeded() ? ".bg-white.content-black" : " "),
+					".flex-grow.mlr-safe-inset.scroll-x.pt.pb" + (this.viewModel.isContrastFixNeeded() ? ".bg-white.content-black" : " "),
 					{
 						class: mailViewerPadding(),
 						oncreate: (vnode) => {

@@ -5,7 +5,7 @@ import { lang } from "../../misc/LanguageViewModel.js"
 import { theme } from "../../gui/theme.js"
 import { Button, ButtonType } from "../../gui/base/Button.js"
 import { noOp } from "@tutao/tutanota-utils"
-import { getElementId, isSameId } from "../../api/common/utils/EntityUtils.js"
+import {elementIdPart, getElementId, isSameId} from "../../api/common/utils/EntityUtils.js"
 import { MiniMailViewer } from "./MiniMailViewer.js"
 import { mailViewerMargin } from "./MailViewerUtils.js"
 import { MailViewerViewModel } from "./MailViewerViewModel.js"
@@ -39,21 +39,31 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 				}),
 			)
 		}
-		const viewModels = viewModel.viewModels()
-		for (const mailViewModel of viewModels) {
-			const normalizedSubject = this.normalizeSubject(mailViewModel.mail.subject)
-			if (normalizedSubject !== lastSubject) {
-				itemsWithHeaders.push(this.renderHeader(normalizedSubject))
-				lastSubject = normalizedSubject
-			}
-			const isPrimary = mailViewModel === viewModel.primaryViewModel()
+		const entries = viewModel.entries()
+		for (const entry of entries) {
+			switch (entry.type) {
+				case "mail": {
+					const mailViewModel = entry.viewModel
+					const normalizedSubject = this.normalizeSubject(mailViewModel.mail.subject)
+					if (normalizedSubject !== lastSubject) {
+						itemsWithHeaders.push(this.renderHeader(normalizedSubject))
+						lastSubject = normalizedSubject
+					}
+					const isPrimary = mailViewModel === viewModel.primaryViewModel()
 
-			itemsWithHeaders.push(this.renderViewer(itemsWithHeaders.length === 0, mailViewModel, isPrimary, viewModel))
+					itemsWithHeaders.push(this.renderViewer(mailViewModel, isPrimary, viewModel))
+					break
+				}
+				case "deleted": {
+					itemsWithHeaders.push(m(UnknownMailView, {key: getElementId(entry.entry)}))
+					break
+				}
+			}
 		}
 		itemsWithHeaders.push(m(".mt-l", { key: "footer" }))
 
 		return m(
-			".fill-absolute.scroll",
+			".fill-absolute.scroll-no-overlay",
 			{
 				style: {
 					backgroundColor: theme.navigation_bg,
@@ -71,12 +81,12 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 		)
 	}
 
-	private renderViewer(first: boolean, mailViewModel: MailViewerViewModel, isPrimary: boolean, viewModel: ConversationViewModel) {
+	private renderViewer(mailViewModel: MailViewerViewModel, isPrimary: boolean, viewModel: ConversationViewModel) {
 		return m(
-			".border-radius" + (first ? "" : ".mt-m"),
+			".border-radius-big.overflow-hidden.mt-m",
 			{
 				class: mailViewerMargin(),
-				key: getElementId(mailViewModel.mail),
+				key: elementIdPart(mailViewModel.mail.conversationEntry),
 				oncreate: (vnode: VnodeDOM) => {
 					if (isPrimary) {
 						console.log("create primary")
@@ -108,7 +118,7 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 
 	private renderHeader(normalizedSubject: string): Children {
 		return m(
-			".h5.subject.text-break.selectable.b.flex-grow",
+			".h5.subject.text-break.selectable.b.flex-grow.mt-m",
 			{
 				class: mailViewerMargin(),
 				key: normalizedSubject,
@@ -127,9 +137,8 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 			// but why is it not attached if it's already next frame?
 
 			this.didScroll = { mail: viewModel.mail._id }
-			const stack = new Error().stack
 			requestAnimationFrame(() => {
-				console.log("scrolling to", primaryDom.offsetTop, primaryDom.parentNode, stack)
+				// console.log("scrolling to", primaryDom.offsetTop, primaryDom.parentNode, stack)
 				containerDom.scrollTo({ top: primaryDom.offsetTop })
 			})
 		}
@@ -138,5 +147,18 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 	private normalizeSubject(subject: string): string {
 		const match = subject.match(/^(?:(?:re|fwd):?\s*)*(.*)$/i)
 		return match ? match[1] : ""
+	}
+}
+
+class UnknownMailView implements Component {
+	view() {
+		// FIXME: placeholder for now
+		return m(".center.pt.pb.font-weight-600.border-radius-big.mt-m", {
+			class: mailViewerMargin(),
+			style: {
+				border: `1px solid ${theme.list_border}`,
+				color: theme.content_button,
+			}
+		}, "Unknown email")
 	}
 }

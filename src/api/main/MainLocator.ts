@@ -269,9 +269,12 @@ class MainLocator {
 	): Promise<ConversationViewModel> {
 		const {ConversationViewModel} = await import("../../mail/view/ConversationViewModel.js")
 		const factory = await this.mailViewerViewModelFactory()
+		const m = await import("mithril")
 		return new ConversationViewModel(
 			options, (options) => factory(options, mailboxDetails, mailboxProperties),
 			this.entityClient,
+			this.eventController,
+			m.redraw,
 		)
 	}
 	async mailViewerViewModelFactory(): Promise<(

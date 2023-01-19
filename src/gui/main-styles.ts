@@ -977,6 +977,9 @@ styles.registerStyle("main", () => {
 		".border-radius-small": {
 			"border-radius": px(size.border_radius_small),
 		},
+		".border-radius-big": {
+			"border-radius": px(size.border_radius_big)
+		},
 		".editor-border": {
 			border: `1px solid ${theme.content_border}`,
 			"padding-top": px(size.vpad_small),
@@ -1419,6 +1422,9 @@ styles.registerStyle("main", () => {
 		},
 		".mt-between-s > :not(:first-child)": {
 			"margin-top": px(size.hpad_small),
+		},
+		".mt-between-m > :not(:first-child)": {
+			"margin-top": px(size.hpad),
 		},
 		// dropdown
 		".dropdown-panel": {
