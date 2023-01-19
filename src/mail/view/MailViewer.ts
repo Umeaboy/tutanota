@@ -33,7 +33,7 @@ import { ease } from "../../gui/animation/Easing"
 import { isNewMailActionAvailable } from "../../gui/nav/NavFunctions"
 import { CancelledError } from "../../api/common/error/CancelledError"
 import { MailViewerHeader } from "./MailViewerHeader.js"
-import { editDraft, showHeaderDialog } from "./MailViewerUtils.js"
+import {editDraft, mailViewerPadding, showHeaderDialog} from "./MailViewerUtils.js"
 
 assertMainOrNode()
 // map of inline image cid to InlineImageReference
@@ -150,8 +150,9 @@ export class MailViewer implements Component<MailViewerAttrs> {
 			m(".mail-viewer" + ".scroll-no-overlay.overflow-x-hidden", [
 				this.renderMailHeader(vnode.attrs),
 				m(
-					".flex-grow.mlr-safe-inset.scroll-x.plr-l.pt" + (this.viewModel.isContrastFixNeeded() ? ".bg-white.content-black" : " "),
+					".flex-grow.mlr-safe-inset.scroll-x.pt" + (this.viewModel.isContrastFixNeeded() ? ".bg-white.content-black" : " "),
 					{
+						class: mailViewerPadding(),
 						oncreate: (vnode) => {
 							this.scrollDom = vnode.dom as HTMLElement
 						},

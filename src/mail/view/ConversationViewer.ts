@@ -7,6 +7,8 @@ import { Button, ButtonType } from "../../gui/base/Button.js"
 import { noOp } from "@tutao/tutanota-utils"
 import { getElementId, isSameId } from "../../api/common/utils/EntityUtils.js"
 import { MiniMailViewer } from "./MiniMailViewer.js"
+import { mailViewerMargin } from "./MailViewerUtils.js"
+import { MailViewerViewModel } from "./MailViewerViewModel.js"
 
 export interface ConversationViewerAttrs {
 	viewModel: ConversationViewModel
@@ -41,54 +43,12 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 		for (const mailViewModel of viewModels) {
 			const normalizedSubject = this.normalizeSubject(mailViewModel.mail.subject)
 			if (normalizedSubject !== lastSubject) {
-				itemsWithHeaders.push(
-					m(
-						".h5.subject.text-break.selectable.b.flex-grow.pl-l.pr",
-						{
-							key: normalizedSubject,
-							"aria-label": lang.get("subject_label") + ", " + (normalizedSubject || ""),
-							style: { marginTop: "12px" },
-						},
-						normalizedSubject,
-					),
-				)
+				itemsWithHeaders.push(this.renderHeader(normalizedSubject))
 				lastSubject = normalizedSubject
 			}
 			const isPrimary = mailViewModel === viewModel.primaryViewModel()
 
-			itemsWithHeaders.push(
-				m(
-					".plr.mlr-l.border-radius" + (itemsWithHeaders.length ? ".mt-m" : ""),
-					{
-						key: getElementId(mailViewModel.mail),
-						oncreate: (vnode: VnodeDOM) => {
-							if (isPrimary) {
-								console.log("create primary")
-								this.primaryDom = vnode.dom as HTMLElement
-								this.doScroll(viewModel)
-							}
-						},
-						onremove: () => {
-							if (isPrimary) {
-								console.log("remove primary")
-							}
-						},
-						style: {
-							border: `1px solid ${theme.list_border}`,
-							backgroundColor: theme.content_bg,
-						},
-					},
-					// probably should trigger the load from somewhere here but currently we need to render mail viewer for that to happen
-					!isPrimary && mailViewModel.isCollapsed()
-						? m(MiniMailViewer, {
-								viewModel: mailViewModel,
-						  })
-						: m(MailViewer, {
-								viewModel: mailViewModel,
-								isPrimary: isPrimary,
-						  }),
-				),
-			)
+			itemsWithHeaders.push(this.renderViewer(itemsWithHeaders.length === 0, mailViewModel, isPrimary, viewModel))
 		}
 		itemsWithHeaders.push(m(".mt-l", { key: "footer" }))
 
@@ -108,6 +68,54 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 				},
 			},
 			itemsWithHeaders,
+		)
+	}
+
+	private renderViewer(first: boolean, mailViewModel: MailViewerViewModel, isPrimary: boolean, viewModel: ConversationViewModel) {
+		return m(
+			".border-radius" + (first ? "" : ".mt-m"),
+			{
+				class: mailViewerMargin(),
+				key: getElementId(mailViewModel.mail),
+				oncreate: (vnode: VnodeDOM) => {
+					if (isPrimary) {
+						console.log("create primary")
+						this.primaryDom = vnode.dom as HTMLElement
+						this.doScroll(viewModel)
+					}
+				},
+				onremove: () => {
+					if (isPrimary) {
+						console.log("remove primary")
+					}
+				},
+				style: {
+					border: `1px solid ${theme.list_border}`,
+					backgroundColor: theme.content_bg,
+				},
+			},
+			// probably should trigger the load from somewhere here but currently we need to render mail viewer for that to happen
+			!isPrimary && mailViewModel.isCollapsed()
+				? m(MiniMailViewer, {
+						viewModel: mailViewModel,
+				  })
+				: m(MailViewer, {
+						viewModel: mailViewModel,
+						isPrimary: isPrimary,
+				  }),
+		)
+	}
+
+	private renderHeader(normalizedSubject: string): Children {
+		return m(
+			".h5.subject.text-break.selectable.b.flex-grow",
+			{
+				class: mailViewerMargin(),
+				key: normalizedSubject,
+				"aria-label": lang.get("subject_label") + ", " + (normalizedSubject || ""),
+				style: { marginTop: "12px" },
+			},
+			normalizedSubject,
 		)
 	}
 

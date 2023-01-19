@@ -33,8 +33,9 @@ export interface InfoBannerAttrs {
 export class InfoBanner implements Component<InfoBannerAttrs> {
 	view(vnode: Vnode<InfoBannerAttrs>): Children {
 		const { message, icon, helpLink, buttons, type } = vnode.attrs
+		// FIXME I removed the margin, is this used somewhere else?
 		return m(
-			".info-banner.center-vertically.border-bottom.pr-s.pl.border-radius.mlr-l.mt-xs" + // keep the distance to the bottom of the banner the same in the case that buttons aren't present
+			".info-banner.center-vertically.border-bottom.pr-s.pl.border-radius.mt-xs" + // keep the distance to the bottom of the banner the same in the case that buttons aren't present
 				(buttons && buttons.length > 0 ? "" : ".pb-s"),
 			{
 				style: {

@@ -227,7 +227,8 @@ styles.registerStyle("main", () => {
 			margin: 0,
 			border: "none",
 			height: "1px",
-			"background-color": theme.content_border,
+			// FIXME is this okay in general?
+			"background-color": theme.list_border,
 		},
 		".border": {
 			border: `1px solid ${theme.content_border}`,

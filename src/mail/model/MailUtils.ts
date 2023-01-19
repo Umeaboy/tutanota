@@ -89,6 +89,14 @@ export function getSenderHeading(mail: Mail, preferNameOnly: boolean) {
 	}
 }
 
+export function getSenderAddressDisplay(mail: Mail): string {
+	if (isExcludedMailAddress(mail.sender.address)) {
+		return ""
+	} else {
+		return mail.sender.address
+	}
+}
+
 export function getRecipientHeading(mail: Mail, preferNameOnly: boolean) {
 	if (isLegacyMail(mail)) {
 		const allRecipients = mail.toRecipients.concat(mail.ccRecipients).concat(mail.bccRecipients)

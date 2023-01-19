@@ -1,6 +1,6 @@
 import m, { Children, Component, Vnode } from "mithril"
 import { InfoLink, lang } from "../../misc/LanguageViewModel.js"
-import { getMailAddressDisplayText, getSenderHeading, isTutanotaTeamMail } from "../model/MailUtils.js"
+import { getMailAddressDisplayText, getSenderAddressDisplay, isTutanotaTeamMail } from "../model/MailUtils.js"
 import { theme } from "../../gui/theme.js"
 import { styles } from "../../gui/styles.js"
 import { ExpanderPanel } from "../../gui/base/Expander.js"
@@ -25,9 +25,10 @@ import { promptAndDeleteMails, showMoveMailsDropdown } from "./MailGuiUtils.js"
 import { UserError } from "../../api/main/UserError.js"
 import { showUserError } from "../../misc/ErrorHandlerImpl.js"
 import { BootIcons } from "../../gui/base/icons/BootIcons.js"
-import { editDraft, mailViewerMoreActions, makeAssignMailsButtons } from "./MailViewerUtils.js"
+import { editDraft, mailViewerMargin, mailViewerMoreActions, mailViewerPadding, makeAssignMailsButtons } from "./MailViewerUtils.js"
 import { liveDataAttrs } from "../../gui/AriaUtils.js"
 import { isKeyPressed } from "../../misc/KeyManager.js"
+import { ButtonSize } from "../../gui/base/ButtonSize.js"
 
 export interface MailAddressAndName {
 	name: string
@@ -59,7 +60,8 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 		const dateTimeFull = formatDateWithWeekdayAndYear(viewModel.mail.receivedDate) + " • " + formatTime(viewModel.mail.receivedDate)
 
 		if (styles.isSingleColumnLayout()) {
-			return m(".header.mlr-safe-inset.mt", [
+			return m(".header.mlr-safe-inset", [
+				this.renderNarrowSenderAction(viewModel),
 				this.renderFolderText(viewModel),
 				this.renderAddressesAndDate(viewModel, attrs, dateTime, dateTimeFull),
 				m(
@@ -73,7 +75,6 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 				this.renderConnectionLostBanner(viewModel),
 				this.renderEventBanner(viewModel),
 				this.renderBanners(attrs),
-				m("", this.renderSubject(viewModel)),
 			])
 		} else {
 			return m(".header.mlr-safe-inset", [
@@ -95,6 +96,20 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 		}
 	}
 
+	private renderNarrowSenderAction(viewModel: MailViewerViewModel) {
+		return m(".flex.mt-xs.mlr", [
+			m(".flex.flex-wrap.items-end", [this.tutaoBadge(viewModel), m("span.text-break.font-weight-600", viewModel.mail.sender.name)]),
+			m(".flex-grow"),
+			// FIXME I wanna be a real button!
+			m(IconButton, {
+				title: "more_label",
+				icon: Icons.More,
+				click: noOp,
+				size: ButtonSize.Compact,
+			}),
+		])
+	}
+
 	private renderFolderText(viewModel: MailViewerViewModel) {
 		return viewModel.getFolderText()
 			? m(".flex.small.plr-l.mt-xs.mb-xs.ml-between-s", [m(".b.mr-s", m("", lang.get("location_label"))), viewModel.getFolderText()])
@@ -103,8 +118,9 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 
 	private renderAddressesAndDate(viewModel: MailViewerViewModel, attrs: MailViewerHeaderAttrs, dateTime: string, dateTimeFull: string) {
 		return m(
-			".flex.plr-l.mt-xs.click.col",
+			".flex.mt-xs.click.col",
 			{
+				class: mailViewerMargin(),
 				role: "button",
 				"aria-pressed": String(this.detailsExpanded),
 				tabindex: TabIndex.Default,
@@ -119,6 +135,7 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 				},
 			},
 			[
+				m(".small.flex.flex-wrap.items-start", [this.tutaoBadge(viewModel), m("span.text-break", getSenderAddressDisplay(viewModel.mail))]),
 				m(".flex", [
 					this.getRecipientEmailAddress(attrs),
 					m(".flex-grow"),
@@ -153,8 +170,7 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 
 	private renderSubjectActionsLine(viewModel: MailViewerViewModel, attrs: MailViewerHeaderAttrs) {
 		return m(".flex.items-start.pl-l", [
-			// this.renderSubject(viewModel),
-			m(".flex.flex-wrap.items-start.mt", [this.tutaoBadge(viewModel), m("span.text-break", getSenderHeading(viewModel.mail, false))]),
+			m(".flex.flex-wrap.items-start.mt", [this.tutaoBadge(viewModel), m("span.text-break.font-weight-600", viewModel.mail.sender.name)]),
 			this.actionButtons(attrs),
 		])
 	}
@@ -173,10 +189,16 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 	private renderBanners(attrs: MailViewerHeaderAttrs): Children {
 		const { viewModel } = attrs
 		if (viewModel.isCollapsed()) return null
+		// we don't wrap it in a single element because our container might depend on us being separate children for margins
 		return [
-			this.renderPhishingWarning(viewModel) || this.renderHardAuthenticationFailWarning(viewModel) || this.renderSoftAuthenticationFailWarning(viewModel),
-			this.renderExternalContentBanner(attrs),
-			m("hr.hr.mt-xs.mlr-l"),
+			m(
+				"." + mailViewerMargin(),
+				this.renderPhishingWarning(viewModel) ||
+					this.renderHardAuthenticationFailWarning(viewModel) ||
+					this.renderSoftAuthenticationFailWarning(viewModel),
+			),
+			m("." + mailViewerMargin(), this.renderExternalContentBanner(attrs)),
+			m("hr.hr.mt-xs." + mailViewerMargin()),
 		].filter(Boolean)
 	}
 
@@ -217,7 +239,7 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 	private renderDetails(attrs: MailViewerHeaderAttrs, { bubbleMenuWidth }: { bubbleMenuWidth: number }): Children {
 		const { viewModel, createMailAddressContextButtons } = attrs
 		const envelopeSender = viewModel.getDifferentEnvelopeSender()
-		return m(".plr-l" + liveDataAttrs(), [
+		return m("." + mailViewerPadding() + liveDataAttrs(), [
 			m(
 				".mt-s",
 				m(".small.b", lang.get("from_label")),

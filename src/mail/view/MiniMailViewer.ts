@@ -6,6 +6,7 @@ import { theme } from "../../gui/theme.js"
 import { MailFolderType } from "../../api/common/TutanotaConstants.js"
 import { AllIcons, Icon } from "../../gui/base/Icon.js"
 import { Icons } from "../../gui/base/icons/Icons.js"
+import {mailViewerPadding} from "./MailViewerUtils.js"
 
 export interface MiniMailViewerAttrs {
 	viewModel: MailViewerViewModel
@@ -17,8 +18,9 @@ export class MiniMailViewer implements Component<MiniMailViewerAttrs> {
 		const { mail } = viewModel
 		const dateTime = formatDateWithWeekday(mail.receivedDate) + " • " + formatTime(mail.receivedDate)
 		return m(
-			".flex.items-center.pt.pb.plr-l.click",
+			".flex.items-center.pt.pb.click",
 			{
+				class: mailViewerPadding(),
 				style: {
 					color: theme.content_button,
 				},
