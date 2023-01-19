@@ -61,7 +61,7 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 
 		if (styles.isSingleColumnLayout()) {
 			return m(".header.mlr-safe-inset", [
-				this.renderNarrowSenderAction(viewModel),
+				this.renderNarrowSenderAction(attrs),
 				this.renderFolderText(viewModel),
 				this.renderAddressesAndDate(viewModel, attrs, dateTime, dateTimeFull),
 				m(
@@ -78,7 +78,7 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 			])
 		} else {
 			return m(".header.mlr-safe-inset", [
-				this.renderSubjectActionsLine(viewModel, attrs),
+				this.renderSubjectActionsLine(attrs),
 				this.renderFolderText(viewModel),
 				this.renderAddressesAndDate(viewModel, attrs, dateTime, dateTimeFull),
 				m(
@@ -96,9 +96,12 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 		}
 	}
 
-	private renderNarrowSenderAction(viewModel: MailViewerViewModel) {
+	private renderNarrowSenderAction({ viewModel, isPrimary }: MailViewerHeaderAttrs) {
 		return m(".flex.mt-xs.mlr", [
-			m(".flex.flex-wrap.items-end", [this.tutaoBadge(viewModel), m("span.text-break.font-weight-600", viewModel.mail.sender.name)]),
+			m(".flex.flex-wrap.items-end", [
+				this.tutaoBadge(viewModel),
+				m("span.text-break" + (isPrimary ? ".font-weight-600" : ""), viewModel.mail.sender.name),
+			]),
 			m(".flex-grow"),
 			// FIXME I wanna be a real button!
 			m(IconButton, {
@@ -168,9 +171,13 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 		)
 	}
 
-	private renderSubjectActionsLine(viewModel: MailViewerViewModel, attrs: MailViewerHeaderAttrs) {
+	private renderSubjectActionsLine(attrs: MailViewerHeaderAttrs) {
+		const { viewModel } = attrs
 		return m(".flex.items-start.pl-l", [
-			m(".flex.flex-wrap.items-start.mt", [this.tutaoBadge(viewModel), m("span.text-break.font-weight-600", viewModel.mail.sender.name)]),
+			m(".flex.flex-wrap.items-start.mt", [
+				this.tutaoBadge(viewModel),
+				m("span.text-break" + (attrs.isPrimary ? ".font-weight-600" : ""), viewModel.mail.sender.name),
+			]),
 			this.actionButtons(attrs),
 		])
 	}
