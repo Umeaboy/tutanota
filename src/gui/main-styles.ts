@@ -595,6 +595,9 @@ styles.registerStyle("main", () => {
 		".content-bg": {
 			"background-color": theme.content_bg,
 		},
+		".nav-bg": {
+			"background-color": theme.navigation_bg,
+		},
 		".content-hover:hover": {
 			color: theme.content_accent,
 		},

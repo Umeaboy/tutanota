@@ -5,7 +5,7 @@ import { lang } from "../../misc/LanguageViewModel.js"
 import { theme } from "../../gui/theme.js"
 import { Button, ButtonType } from "../../gui/base/Button.js"
 import { noOp } from "@tutao/tutanota-utils"
-import {elementIdPart, getElementId, isSameId} from "../../api/common/utils/EntityUtils.js"
+import { elementIdPart, getElementId, isSameId } from "../../api/common/utils/EntityUtils.js"
 import { MiniMailViewer } from "./MiniMailViewer.js"
 import { mailViewerMargin } from "./MailViewerUtils.js"
 import { MailViewerViewModel } from "./MailViewerViewModel.js"
@@ -26,7 +26,7 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 		if (this.didScroll && !isSameId(viewModel.mail._id, this.didScroll.mail)) {
 			this.didScroll = null
 		}
-		this.doScroll(viewModel)
+		// this.doScroll(viewModel)
 
 		if (viewModel.isConnectionLost()) {
 			return m(
@@ -55,29 +55,60 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 					break
 				}
 				case "deleted": {
-					itemsWithHeaders.push(m(UnknownMailView, {key: getElementId(entry.entry)}))
+					itemsWithHeaders.push(m(UnknownMailView, { key: getElementId(entry.entry) }))
 					break
 				}
 			}
 		}
 		itemsWithHeaders.push(m(".mt-l", { key: "footer" }))
 
+		return m(".fill-absolute.nav-bg", [
+			m(
+				".fill-absolute.scroll",
+				{
+					oncreate: (vnode) => {
+						console.log("create container")
+						this.containerDom = vnode.dom
+						// this.doScroll(viewModel)
+					},
+					onremove: () => {
+						console.log("remove container")
+					},
+					// should probably use intersection observer to detect which subject is visible instead
+					onscroll: (event: Event) => {
+						// FIXME do not redraw all the time maybe
+					},
+				},
+				itemsWithHeaders,
+			),
+			// FIXME: last subject for now?
+			lastSubject && this.renderFloatingHeader(lastSubject),
+		])
+	}
+
+	private renderFloatingHeader(subject: string) {
 		return m(
-			".fill-absolute.scroll-no-overlay",
+			".abs.nav-bg",
 			{
+				// class: mailViewerPadding(),
+				class: mailViewerMargin(),
 				style: {
-					backgroundColor: theme.navigation_bg,
-				},
-				oncreate: (vnode) => {
-					console.log("create container")
-					this.containerDom = vnode.dom
-					this.doScroll(viewModel)
-				},
-				onremove: () => {
-					console.log("remove container")
+					top: 0,
+					left: 0,
+					right: 0,
+					borderBottom: `1px solid ${theme.list_border}`,
+					transition: `200ms ease-in-out`,
+					transform: this.containerDom && this.containerDom.scrollTop > 40 ? "translateY(0)" : "translateY(-40px)",
 				},
 			},
-			itemsWithHeaders,
+			m(
+				".b.subject.text-break.pt-s.pb-s.text-ellipsis",
+				{
+					// class: mailViewerMargin(),
+				},
+				subject,
+				// "Test subject but much longer so that maybe it wraps and like the whole message in there, which maniac actually does this? Unbelievable",
+			),
 		)
 	}
 
@@ -91,7 +122,7 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 					if (isPrimary) {
 						console.log("create primary")
 						this.primaryDom = vnode.dom as HTMLElement
-						this.doScroll(viewModel)
+						// this.doScroll(viewModel)
 					}
 				},
 				onremove: () => {
@@ -121,7 +152,7 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 			".h5.subject.text-break.selectable.b.flex-grow.mt-m",
 			{
 				class: mailViewerMargin(),
-				key: normalizedSubject,
+				key: "item-subject" + normalizedSubject,
 				"aria-label": lang.get("subject_label") + ", " + (normalizedSubject || ""),
 				style: { marginTop: "12px" },
 			},
@@ -152,13 +183,17 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 
 class UnknownMailView implements Component {
 	view() {
-		// FIXME: placeholder for now
-		return m(".center.pt.pb.font-weight-600.border-radius-big.mt-m", {
-			class: mailViewerMargin(),
-			style: {
-				border: `1px solid ${theme.list_border}`,
-				color: theme.content_button,
-			}
-		}, "Unknown email")
+		return m(
+			".center.pt.pb.font-weight-600.border-radius-big.mt-m",
+			{
+				class: mailViewerMargin(),
+				style: {
+					border: `1px solid ${theme.list_border}`,
+					color: theme.content_button,
+				},
+			},
+			// FIXME: placeholder for now
+			"Unknown email",
+		)
 	}
 }
