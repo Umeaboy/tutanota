@@ -6,7 +6,7 @@ import { theme } from "../../gui/theme.js"
 import { MailFolderType } from "../../api/common/TutanotaConstants.js"
 import { AllIcons, Icon } from "../../gui/base/Icon.js"
 import { Icons } from "../../gui/base/icons/Icons.js"
-import {mailViewerPadding} from "./MailViewerUtils.js"
+import { mailViewerPadding } from "./MailViewerUtils.js"
 
 export interface MiniMailViewerAttrs {
 	viewModel: MailViewerViewModel
@@ -25,13 +25,13 @@ export class MiniMailViewer implements Component<MiniMailViewerAttrs> {
 					color: theme.content_button,
 				},
 				// FIXME: is correct?
-				onclick: () => viewModel.loadAll({notify: true}),
+				onclick: () => viewModel.loadAll({ notify: true }),
 			},
 			[
 				m(".font-weight-600", getMailAddressDisplayText(mail.sender.name, mail.sender.address, true)),
 				m(".flex-grow"),
 				m(".flex.ml-between-s.items-center", [
-					mail.attachments ? this.renderIcon(Icons.Attachment) : null,
+					mail.attachments.length > 0 ? this.renderIcon(Icons.Attachment) : null,
 					// FIXME the right folder
 					viewModel.isConfidential() ? this.renderIcon(Icons.Lock) : null,
 					this.renderIcon(getFolderIconByType(MailFolderType.INBOX)),
