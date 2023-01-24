@@ -1,6 +1,6 @@
 import m, { Children, Component, Vnode } from "mithril"
 import { InfoLink, lang } from "../../misc/LanguageViewModel.js"
-import { getMailAddressDisplayText, getSenderAddressDisplay, isTutanotaTeamMail } from "../model/MailUtils.js"
+import { getFolderIconByType, getMailAddressDisplayText, getSenderAddressDisplay, isTutanotaTeamMail } from "../model/MailUtils.js"
 import { theme } from "../../gui/theme.js"
 import { styles } from "../../gui/styles.js"
 import { ExpanderPanel } from "../../gui/base/Expander.js"
@@ -10,7 +10,7 @@ import { Icons } from "../../gui/base/icons/Icons.js"
 import { EventBanner } from "./EventBanner.js"
 import { RecipientButton } from "../../gui/base/RecipientButton.js"
 import { createAsyncDropdown, createDropdown, DomRectReadOnlyPolyfilled, DropdownButtonAttrs } from "../../gui/base/Dropdown.js"
-import { InboxRuleType, Keys, MailAuthenticationStatus, TabIndex } from "../../api/common/TutanotaConstants.js"
+import { getMailFolderType, InboxRuleType, Keys, MailAuthenticationStatus, TabIndex } from "../../api/common/TutanotaConstants.js"
 import { Icon, progressIcon } from "../../gui/base/Icon.js"
 import { formatDateWithWeekday, formatDateWithWeekdayAndYear, formatStorageSize, formatTime } from "../../misc/Formatter.js"
 import { isAndroidApp, isDesktop, isIOSApp } from "../../api/common/Env.js"
@@ -29,6 +29,7 @@ import { editDraft, mailViewerMargin, mailViewerMoreActions, mailViewerPadding, 
 import { liveDataAttrs } from "../../gui/AriaUtils.js"
 import { isKeyPressed } from "../../misc/KeyManager.js"
 import { ButtonSize } from "../../gui/base/ButtonSize.js"
+import { locator } from "../../api/main/MainLocator.js"
 
 export interface MailAddressAndName {
 	name: string
@@ -114,12 +115,30 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 	}
 
 	private renderFolderText(viewModel: MailViewerViewModel) {
+		const folder = locator.mailModel.getMailFolder(viewModel.mail._id[0])
+		const icon = folder ? getFolderIconByType(getMailFolderType(folder)) : null
+
 		return viewModel.getFolderText()
-			? m(".flex.small.plr-l.mt-xs.mb-xs.ml-between-s", [m(".b.mr-s", m("", lang.get("location_label"))), viewModel.getFolderText()])
+			? m(".flex.small.plr-l.mt-xs.mb-xs.ml-between-s", [
+					m(".b", m("", lang.get("location_label"))),
+					icon
+						? m(Icon, {
+								icon,
+								container: "div",
+								style: {
+									fill: theme.content_button,
+								},
+						  })
+						: null,
+					m(".span.mr-s", viewModel.getFolderText()),
+			  ])
 			: null
 	}
 
 	private renderAddressesAndDate(viewModel: MailViewerViewModel, attrs: MailViewerHeaderAttrs, dateTime: string, dateTimeFull: string) {
+		const folder = locator.mailModel.getMailFolder(viewModel.mail._id[0])
+		const icon = folder ? getFolderIconByType(getMailFolderType(folder)) : null
+
 		return m(
 			".flex.mt-xs.click.col",
 			{
@@ -143,7 +162,7 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 					this.getRecipientEmailAddress(attrs),
 					m(".flex-grow"),
 					m(
-						".flex.items-center.white-space-pre.ml-s",
+						".flex.items-center.white-space-pre.ml-s.ml-between-s",
 						{
 							// Orca refuses to read ut unless it's not focusable
 							tabindex: TabIndex.Default,
@@ -158,6 +177,15 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 										},
 										// flex makes svg inside centered and not randomly somewhere
 										class: "flex",
+								  })
+								: null,
+							icon
+								? m(Icon, {
+										icon,
+										container: "div",
+										style: {
+											fill: theme.content_button,
+										},
 								  })
 								: null,
 							m("small.date.content-fg.selectable", [

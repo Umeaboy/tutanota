@@ -31,7 +31,7 @@ import { ConfigurationDatabase } from "../../api/worker/facades/ConfigurationDat
 import { InlineImages } from "./MailViewer"
 import { isDesktop } from "../../api/common/Env"
 import stream from "mithril/stream"
-import { addAll, assertNotNull, contains, downcast, filterInt, first, groupBy, isNotNull, neverNull, noOp, ofClass, startsWith } from "@tutao/tutanota-utils"
+import { addAll, contains, downcast, filterInt, first, neverNull, noOp, ofClass, startsWith } from "@tutao/tutanota-utils"
 import { lang } from "../../misc/LanguageViewModel"
 import {
 	getDefaultSender,
@@ -46,7 +46,7 @@ import {
 import { LoginController } from "../../api/main/LoginController"
 import m from "mithril"
 import { LockedError, NotAuthorizedError, NotFoundError } from "../../api/common/error/RestError"
-import { elementIdPart, getElementId, haveSameId, isSameId, listIdPart } from "../../api/common/utils/EntityUtils"
+import { elementIdPart, haveSameId, isSameId, listIdPart } from "../../api/common/utils/EntityUtils"
 import { getReferencedAttachments, loadInlineImages, moveMails, revokeInlineImages } from "./MailGuiUtils"
 import { SanitizedFragment } from "../../misc/HtmlSanitizer"
 import { CALENDAR_MIME_TYPE, FileController } from "../../file/FileController"

@@ -3,10 +3,11 @@ import { getFolderIconByType, getMailAddressDisplayText } from "../model/MailUti
 import { formatDateWithWeekday, formatTime } from "../../misc/Formatter.js"
 import { MailViewerViewModel } from "./MailViewerViewModel.js"
 import { theme } from "../../gui/theme.js"
-import { MailFolderType } from "../../api/common/TutanotaConstants.js"
 import { AllIcons, Icon } from "../../gui/base/Icon.js"
 import { Icons } from "../../gui/base/icons/Icons.js"
 import { mailViewerPadding } from "./MailViewerUtils.js"
+import { locator } from "../../api/main/MainLocator.js"
+import { getMailFolderType } from "../../api/common/TutanotaConstants.js"
 
 export interface MiniMailViewerAttrs {
 	viewModel: MailViewerViewModel
@@ -17,6 +18,8 @@ export class MiniMailViewer implements Component<MiniMailViewerAttrs> {
 		const { viewModel } = attrs
 		const { mail } = viewModel
 		const dateTime = formatDateWithWeekday(mail.receivedDate) + " • " + formatTime(mail.receivedDate)
+		const folder = locator.mailModel.getMailFolder(mail._id[0])
+
 		return m(
 			".flex.items-center.pt.pb.click",
 			{
@@ -34,7 +37,7 @@ export class MiniMailViewer implements Component<MiniMailViewerAttrs> {
 					mail.attachments.length > 0 ? this.renderIcon(Icons.Attachment) : null,
 					// FIXME the right folder
 					viewModel.isConfidential() ? this.renderIcon(Icons.Lock) : null,
-					this.renderIcon(getFolderIconByType(MailFolderType.INBOX)),
+					folder ? this.renderIcon(getFolderIconByType(getMailFolderType(folder))) : null,
 					m(".small.font-weight-600", dateTime),
 				]),
 			],
