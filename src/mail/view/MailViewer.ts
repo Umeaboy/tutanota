@@ -33,7 +33,9 @@ import { ease } from "../../gui/animation/Easing"
 import { isNewMailActionAvailable } from "../../gui/nav/NavFunctions"
 import { CancelledError } from "../../api/common/error/CancelledError"
 import { MailViewerHeader } from "./MailViewerHeader.js"
-import {editDraft, mailViewerPadding, showHeaderDialog} from "./MailViewerUtils.js"
+import { editDraft, mailViewerPadding, showHeaderDialog } from "./MailViewerUtils.js"
+import { IconButton } from "../../gui/base/IconButton.js"
+import { ButtonSize } from "../../gui/base/ButtonSize.js"
 
 assertMainOrNode()
 // map of inline image cid to InlineImageReference
@@ -276,6 +278,12 @@ export class MailViewer implements Component<MailViewerAttrs> {
 		wrapNode.style.lineHeight = String(this.bodyLineHeight ? this.bodyLineHeight.toString() : size.line_height)
 		wrapNode.style.transformOrigin = "top left"
 		wrapNode.appendChild(sanitizedMailBody.cloneNode(true))
+
+		// query all top level block quotes
+		for (const quote of Array.from(wrapNode.querySelectorAll("blockquote:not(blockquote blockquote)")) as HTMLElement[]) {
+			this.createCollapsedBlockQuote(quote)
+		}
+
 		if (client.isMobileDevice()) {
 			wrapNode.addEventListener("touchstart", (event) => {
 				const touch = event.touches[0]
@@ -300,6 +308,40 @@ export class MailViewer implements Component<MailViewerAttrs> {
 		this.shadowDomRoot.appendChild(styles.getStyleSheetElement("main"))
 		this.shadowDomRoot.appendChild(wrapNode)
 		this.currentlyRenderedMailBody = sanitizedMailBody
+	}
+
+	private createCollapsedBlockQuote(quote: HTMLElement) {
+		const quoteWrap = document.createElement("div")
+		quote.style.display = "none"
+
+		quote.replaceWith(quoteWrap)
+
+		const expandButton = document.createElement("div")
+		expandButton.style.border = `1px solid ${theme.list_border}`
+		// restrict wrapper size
+		expandButton.classList.add("flex")
+		expandButton.style.maxWidth = "fit-content"
+		expandButton.style.borderRadius = "25%"
+
+		m.render(
+			expandButton,
+			m(IconButton, {
+				icon: Icons.More,
+				size: ButtonSize.Compact,
+				click: () => {
+					if (quote.style.display === "none") {
+						quote.style.display = ""
+					} else {
+						quote.style.display = "none"
+					}
+				},
+				// FIXME
+				title: "more_label",
+			}),
+		)
+
+		quoteWrap.appendChild(expandButton)
+		quoteWrap.appendChild(quote)
 	}
 
 	private clearDomBody() {

@@ -981,7 +981,7 @@ styles.registerStyle("main", () => {
 			"border-radius": px(size.border_radius_small),
 		},
 		".border-radius-big": {
-			"border-radius": px(size.border_radius_big)
+			"border-radius": px(size.border_radius_big),
 		},
 		".editor-border": {
 			border: `1px solid ${theme.content_border}`,

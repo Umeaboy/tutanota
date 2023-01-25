@@ -1020,8 +1020,8 @@ export class MailViewerViewModel {
 	canForwardOrMove(): boolean {
 		return this.logins.getUserController().isInternalUser() && !this.areParticipantsRestricted()
 	}
-	shouldDelayRendering(): boolean {
 
+	shouldDelayRendering(): boolean {
 		return this.renderIsDelayed
 	}
 
