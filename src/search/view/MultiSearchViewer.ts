@@ -9,44 +9,43 @@ import { NotFoundError } from "../../api/common/error/RestError"
 import type { Contact, Mail } from "../../api/entities/tutanota/TypeRefs.js"
 import { ContactTypeRef, MailTypeRef } from "../../api/entities/tutanota/TypeRefs.js"
 import { Dialog } from "../../gui/base/Dialog"
-import { allMailsAllowedInsideFolder, getFolderIcon, getIndentedFolderNameForDropdown, markMails } from "../../mail/model/MailUtils"
+import { getFolderIcon, getIndentedFolderNameForDropdown, getMailMoveTargets, markMails } from "../../mail/model/MailUtils"
 import { showProgressDialog } from "../../gui/dialogs/ProgressDialog"
 import { mergeContacts } from "../../contacts/ContactMergeUtils"
 import { logins } from "../../api/main/LoginController"
 import { FeatureType } from "../../api/common/TutanotaConstants"
 import { exportContacts } from "../../contacts/VCardExporter"
-import { downcast, isNotNull, isSameTypeRef, lazyMemoized, NBSP, noOp, ofClass } from "@tutao/tutanota-utils"
+import { isNotNull, isSameTypeRef, lazyMemoized, NBSP, noOp, ofClass } from "@tutao/tutanota-utils"
 import { theme } from "../../gui/theme"
 import { BootIcons } from "../../gui/base/icons/BootIcons"
 import { locator } from "../../api/main/MainLocator"
 import { attachDropdown, DropdownButtonAttrs } from "../../gui/base/Dropdown.js"
 import { moveMails } from "../../mail/view/MailGuiUtils"
 import { exportMails } from "../../mail/export/Exporter"
-import { MailboxDetail } from "../../mail/model/MailModel"
 import { IconButtonAttrs } from "../../gui/base/IconButton.js"
+import { assertIsEntity2 } from "../../api/common/utils/EntityUtils.js"
 
 assertMainOrNode()
 
 export class MultiSearchViewer implements Component {
 	view: Component["view"]
-	private _searchListView: SearchListView
-	private _isMailList!: boolean
-	private _mobileMailActionBarButtons: () => IconButtonAttrs[]
-	private _mobileContactActionBarButtons: () => IconButtonAttrs[]
+	private readonly searchListView: SearchListView
+	private isMailList!: boolean
+	private readonly mobileMailActionBarButtons: () => IconButtonAttrs[]
+	private readonly mobileContactActionBarButtons: () => IconButtonAttrs[]
 
 	constructor(searchListView: SearchListView) {
-		this._searchListView = searchListView
-		const mailActionBarButtons = this.createMailActionBarButtons(true)
+		this.searchListView = searchListView
 		const contactActionBarButtons = this.createContactActionBarButtons(true)
-		this._mobileMailActionBarButtons = lazyMemoized(() => this.createMailActionBarButtons(false))
-		this._mobileContactActionBarButtons = lazyMemoized(() => this.createContactActionBarButtons(false))
+		this.mobileMailActionBarButtons = () => this.createMailActionBarButtons(false)
+		this.mobileContactActionBarButtons = lazyMemoized(() => this.createContactActionBarButtons(false))
 
 		this.view = () => {
-			if (this._searchListView._lastType) {
-				if (this._searchListView._lastType === MailTypeRef) {
-					this._isMailList = true
+			if (this.searchListView._lastType) {
+				if (this.searchListView._lastType === MailTypeRef) {
+					this.isMailList = true
 				} else {
-					this._isMailList = false
+					this.isMailList = false
 				}
 			} else {
 				console.log("ERROR LIST TYPE NOT FOUND")
@@ -55,8 +54,8 @@ export class MultiSearchViewer implements Component {
 			return [
 				m(
 					".fill-absolute.mt-xs.plr-l",
-					this._searchListView.list && this._searchListView.list.getSelectedEntities().length > 0
-						? this._viewingMails()
+					this.searchListView.list && this.searchListView.list.getSelectedEntities().length > 0
+						? this.viewingMails()
 							? [
 									// Add spacing so the buttons are where the mail view are
 									m(
@@ -67,9 +66,9 @@ export class MultiSearchViewer implements Component {
 										]),
 									),
 									m(".flex-space-between.mr-negative-s", [
-										m(".flex.items-center", this._getSearchSelectionMessage(this._searchListView)),
+										m(".flex.items-center", this.getSearchSelectionMessage(this.searchListView)),
 										m(ActionBar, {
-											buttons: mailActionBarButtons,
+											buttons: this.createMailActionBarButtons(true),
 										}),
 									]),
 							  ]
@@ -80,7 +79,7 @@ export class MultiSearchViewer implements Component {
 										m(".left.flex-grow", [
 											m(".contact-actions.flex-wrap.flex-grow-shrink", [
 												m(".h2", NBSP),
-												m(".flex-space-between", m(".flex-wrap.items-center", this._getSearchSelectionMessage(this._searchListView))),
+												m(".flex-space-between", m(".flex-wrap.items-center", this.getSearchSelectionMessage(this.searchListView))),
 											]),
 										]),
 										m(
@@ -92,19 +91,19 @@ export class MultiSearchViewer implements Component {
 									),
 							  ]
 						: m(ColumnEmptyMessageBox, {
-								message: () => this._getSearchSelectionMessage(this._searchListView),
+								message: () => this.getSearchSelectionMessage(this.searchListView),
 								color: theme.content_message_bg,
-								icon: this._isMailList ? BootIcons.Mail : BootIcons.Contacts,
+								icon: this.isMailList ? BootIcons.Mail : BootIcons.Contacts,
 						  }),
 				),
 			]
 		}
 	}
 
-	_getSearchSelectionMessage(searchListView: SearchListView): string {
+	private getSearchSelectionMessage(searchListView: SearchListView): string {
 		let nbrOfSelectedSearchEntities = searchListView.list ? searchListView.list.getSelectedEntities().length : 0
 
-		if (this._isMailList) {
+		if (this.isMailList) {
 			if (nbrOfSelectedSearchEntities === 0) {
 				return lang.get("noMail_msg")
 			} else if (nbrOfSelectedSearchEntities === 1) {
@@ -127,21 +126,21 @@ export class MultiSearchViewer implements Component {
 		}
 	}
 
-	createContactActionBarButtons(prependCancel: boolean = false): IconButtonAttrs[] {
+	private createContactActionBarButtons(prependCancel: boolean = false): IconButtonAttrs[] {
 		const buttons: (IconButtonAttrs | null)[] = [
 			prependCancel
 				? {
 						title: "cancel_action",
-						click: () => this._searchListView.list && this._searchListView.list.selectNone(),
+						click: () => this.searchListView.list && this.searchListView.list.selectNone(),
 						icon: Icons.Cancel,
 				  }
 				: null,
 			{
 				title: "delete_action",
-				click: () => this._searchListView.deleteSelected(),
+				click: () => this.searchListView.deleteSelected(),
 				icon: Icons.Trash,
 			},
-			this._searchListView.getSelectedEntities().length === 2
+			this.searchListView.getSelectedEntities().length === 2
 				? {
 						title: "merge_action",
 						click: () => this.mergeSelected(),
@@ -151,17 +150,9 @@ export class MultiSearchViewer implements Component {
 			{
 				title: "exportSelectedAsVCard_action",
 				click: () => {
-					let selected = this._searchListView.getSelectedEntities()
+					let selected = this.searchListView.getSelectedEntities()
 
-					let selectedContacts: Contact[] = []
-
-					if (selected.length > 0) {
-						if (isSameTypeRef(selected[0].entry._type, ContactTypeRef)) {
-							selected.forEach((c) => {
-								selectedContacts.push(downcast<Contact>(c.entry))
-							})
-						}
-					}
+					let selectedContacts = selected.map((e) => e.entry).filter(assertIsEntity2(ContactTypeRef))
 
 					exportContacts(selectedContacts)
 				},
@@ -171,25 +162,33 @@ export class MultiSearchViewer implements Component {
 		return buttons.filter(isNotNull)
 	}
 
-	createMailActionBarButtons(prependCancel: boolean = false): IconButtonAttrs[] {
+	private createMailActionBarButtons(prependCancel: boolean = false): IconButtonAttrs[] {
+		const moveTargets = this.createMoveMailButtons()
+		const move =
+			moveTargets.length === 0
+				? []
+				: [
+						attachDropdown({
+							mainButtonAttrs: {
+								title: "move_action",
+								icon: Icons.Folder,
+							},
+							childAttrs: () => moveTargets,
+						}),
+				  ]
+
 		const buttons: (IconButtonAttrs | null)[] = [
 			prependCancel
 				? {
 						title: "cancel_action",
-						click: () => this._searchListView.list && this._searchListView.list.selectNone(),
+						click: () => this.searchListView.list && this.searchListView.list.selectNone(),
 						icon: Icons.Cancel,
 				  }
 				: null,
-			attachDropdown({
-				mainButtonAttrs: {
-					title: "move_action",
-					icon: Icons.Folder,
-				},
-				childAttrs: () => this.createMoveMailButtons(),
-			}),
+			...move,
 			{
 				title: "delete_action",
-				click: () => this._searchListView.deleteSelected(),
+				click: () => this.searchListView.deleteSelected(),
 				icon: Icons.Trash,
 			},
 			attachDropdown({
@@ -200,12 +199,12 @@ export class MultiSearchViewer implements Component {
 				childAttrs: () => [
 					{
 						label: "markUnread_action",
-						click: () => markMails(locator.entityClient, this.getSelectedMails(), true).then(() => this._searchListView.selectNone()),
+						click: () => markMails(locator.entityClient, this.getSelectedMails(), true).then(() => this.searchListView.selectNone()),
 						icon: Icons.NoEye,
 					},
 					{
 						label: "markRead_action",
-						click: () => markMails(locator.entityClient, this.getSelectedMails(), false).then(() => this._searchListView.selectNone()),
+						click: () => markMails(locator.entityClient, this.getSelectedMails(), false).then(() => this.searchListView.selectNone()),
 						icon: Icons.Eye,
 					},
 					!isApp() && !logins.isEnabled(FeatureType.DisableMailExport)
@@ -222,52 +221,29 @@ export class MultiSearchViewer implements Component {
 		return buttons.filter(isNotNull)
 	}
 
-	async createMoveMailButtons(): Promise<DropdownButtonAttrs[]> {
-		let selected = this._searchListView.getSelectedEntities()
+	private createMoveMailButtons(): DropdownButtonAttrs[] {
+		let selected = this.searchListView.getSelectedEntities()
 
-		let selectedMails: Mail[] = []
+		let selectedMails = selected.map((e) => e.entry).filter(assertIsEntity2(MailTypeRef))
 
-		if (selected.length > 0 && isSameTypeRef(selected[0].entry._type, MailTypeRef)) {
-			selected.forEach((m) => {
-				selectedMails.push(downcast<Mail>(m.entry))
-			})
-		}
+		return getMailMoveTargets(locator.mailModel, selectedMails).map((f) => ({
+			label: () => getIndentedFolderNameForDropdown(f),
+			click: () => {
+				//is needed for correct selection behavior on mobile
+				this.searchListView.selectNone()
 
-		let selectedMailbox: MailboxDetail | null = null
-
-		for (const mail of selectedMails) {
-			const mailbox = await locator.mailModel.getMailboxDetailsForMail(mail)
-
-			// We can't move mails from different mailboxes
-			if (selectedMailbox != null && selectedMailbox !== mailbox) {
-				return []
-			}
-
-			selectedMailbox = mailbox
-		}
-
-		if (selectedMailbox == null) return []
-		return selectedMailbox.folders
-			.getIndentedList()
-			.filter((folder) => allMailsAllowedInsideFolder(selectedMails, folder.folder))
-			.map((f) => ({
-				label: () => getIndentedFolderNameForDropdown(f),
-				click: () => {
-					//is needed for correct selection behavior on mobile
-					this._searchListView.selectNone()
-
-					// move all groups one by one because the mail list cannot be modified in parallel
-					return moveMails({ mailModel: locator.mailModel, mails: selectedMails, targetMailFolder: f.folder })
-				},
-				icon: getFolderIcon(f.folder),
-			}))
+				// move all groups one by one because the mail list cannot be modified in parallel
+				return moveMails({ mailModel: locator.mailModel, mails: selectedMails, targetMailFolder: f.folder })
+			},
+			icon: getFolderIcon(f.folder),
+		}))
 	}
 
-	mergeSelected(): Promise<void> {
-		if (this._searchListView.getSelectedEntities().length === 2) {
-			if (isSameTypeRef(this._searchListView.getSelectedEntities()[0].entry._type, ContactTypeRef)) {
-				let keptContact = this._searchListView.getSelectedEntities()[0].entry as any as Contact
-				let goodbyeContact = this._searchListView.getSelectedEntities()[1].entry as any as Contact
+	private mergeSelected(): Promise<void> {
+		if (this.searchListView.getSelectedEntities().length === 2) {
+			if (isSameTypeRef(this.searchListView.getSelectedEntities()[0].entry._type, ContactTypeRef)) {
+				let keptContact = this.searchListView.getSelectedEntities()[0].entry as any as Contact
+				let goodbyeContact = this.searchListView.getSelectedEntities()[1].entry as any as Contact
 
 				if (!keptContact.presharedPassword || !goodbyeContact.presharedPassword || keptContact.presharedPassword === goodbyeContact.presharedPassword) {
 					return Dialog.confirm("mergeAllSelectedContacts_msg").then((confirmed) => {
@@ -281,7 +257,7 @@ export class MultiSearchViewer implements Component {
 										.catch(ofClass(NotFoundError, noOp))
 										.then(() => {
 											//is needed for correct selection behavior on mobile
-											this._searchListView.selectNone()
+											this.searchListView.selectNone()
 										})
 								}),
 							)
@@ -298,27 +274,16 @@ export class MultiSearchViewer implements Component {
 		}
 	}
 
-	getSelectedMails(): Mail[] {
-		let selected = this._searchListView.getSelectedEntities()
-
-		let selectedMails: Mail[] = []
-
-		if (selected.length > 0) {
-			if (isSameTypeRef(selected[0].entry._type, MailTypeRef)) {
-				selected.forEach((m) => {
-					selectedMails.push(m.entry as any as Mail)
-				})
-			}
-		}
-
-		return selectedMails
+	private getSelectedMails(): Mail[] {
+		let selected = this.searchListView.getSelectedEntities()
+		return selected.map((e) => e.entry).filter(assertIsEntity2(MailTypeRef))
 	}
 
 	actionBarButtons(): IconButtonAttrs[] {
-		return this._viewingMails() ? this._mobileMailActionBarButtons() : this._mobileContactActionBarButtons()
+		return this.viewingMails() ? this.mobileMailActionBarButtons() : this.mobileContactActionBarButtons()
 	}
 
-	_viewingMails(): boolean {
-		return this._searchListView._lastType.type === "Mail"
+	private viewingMails(): boolean {
+		return this.searchListView._lastType.type === "Mail"
 	}
 }

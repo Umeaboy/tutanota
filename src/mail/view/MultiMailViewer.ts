@@ -5,7 +5,7 @@ import { ActionBar } from "../../gui/base/ActionBar"
 import ColumnEmptyMessageBox from "../../gui/base/ColumnEmptyMessageBox"
 import { lang } from "../../misc/LanguageViewModel"
 import { Icons } from "../../gui/base/icons/Icons"
-import { allMailsAllowedInsideFolder, emptyOrContainsDraftsAndNonDrafts, getFolderIcon, getIndentedFolderNameForDropdown, markMails } from "../model/MailUtils"
+import { getFolderIcon, getIndentedFolderNameForDropdown, getMailMoveTargets, markMails } from "../model/MailUtils"
 import { logins } from "../../api/main/LoginController"
 import { FeatureType } from "../../api/common/TutanotaConstants"
 import { BootIcons } from "../../gui/base/icons/BootIcons"
@@ -16,9 +16,8 @@ import { moveMails, promptAndDeleteMails } from "./MailGuiUtils"
 import { attachDropdown, DropdownButtonAttrs } from "../../gui/base/Dropdown.js"
 import { exportMails } from "../export/Exporter"
 import { showProgressDialog } from "../../gui/dialogs/ProgressDialog"
-import { MailboxDetail } from "../model/MailModel.js"
 import { IconButtonAttrs } from "../../gui/base/IconButton.js"
-import { haveSameId } from "../../api/common/utils/EntityUtils.js"
+import { ListElement } from "../../api/common/utils/EntityUtils.js"
 
 assertMainOrNode()
 
@@ -80,6 +79,20 @@ export class MultiMailViewer implements Component {
 	getActionBarButtons(prependCancel: boolean = false): IconButtonAttrs[] {
 		const selectedMails = this._mailView.cache.mailList?.list.getSelectedEntities() ?? []
 
+		const moveTargets = this.makeMoveMailButtons(selectedMails)
+		const move =
+			moveTargets.length === 0
+				? []
+				: [
+						attachDropdown({
+							mainButtonAttrs: {
+								title: "move_action",
+								icon: Icons.Folder,
+							},
+							childAttrs: () => moveTargets,
+						}),
+				  ]
+
 		const cancel: IconButtonAttrs[] = prependCancel
 			? [
 					{
@@ -87,19 +100,6 @@ export class MultiMailViewer implements Component {
 						click: () => this._mailView.cache.mailList?.list.selectNone(),
 						icon: Icons.Cancel,
 					},
-			  ]
-			: []
-
-		// if we have both drafts and non-drafts selected, then there is no good place to move them besides deleting them since drafts otherwise only go to the drafts folder and non-drafts do not
-		const move: IconButtonAttrs[] = !emptyOrContainsDraftsAndNonDrafts(selectedMails)
-			? [
-					attachDropdown({
-						mainButtonAttrs: {
-							title: "move_action",
-							icon: Icons.Folder,
-						},
-						childAttrs: () => this.makeMoveMailButtons(selectedMails),
-					}),
 			  ]
 			: []
 
@@ -146,41 +146,20 @@ export class MultiMailViewer implements Component {
 	/**
 	 * Generate buttons that will move the selected mails to respective folders
 	 */
-	private async makeMoveMailButtons(selectedEntities: Mail[]): Promise<DropdownButtonAttrs[]> {
-		let selectedMailbox: MailboxDetail | null = null
-
-		for (const mail of selectedEntities) {
-			const mailBox = await locator.mailModel.getMailboxDetailsForMail(mail)
-
-			// We can't move if mails are from different mailboxes
-			if (selectedMailbox != null && selectedMailbox !== mailBox) {
-				return []
+	private makeMoveMailButtons(selectedEntities: Mail[]): DropdownButtonAttrs[] {
+		return getMailMoveTargets(locator.mailModel, selectedEntities).map((folderInfo) => {
+			return {
+				label: () => getIndentedFolderNameForDropdown(folderInfo),
+				click: this._actionBarAction((mails) =>
+					moveMails({
+						mailModel: locator.mailModel,
+						mails: mails,
+						targetMailFolder: folderInfo.folder,
+					}),
+				),
+				icon: getFolderIcon(folderInfo.folder),
 			}
-
-			selectedMailbox = mailBox
-		}
-
-		if (selectedMailbox == null) return []
-		return selectedMailbox.folders
-			.getIndentedList()
-			.filter(
-				(folderInfo) =>
-					allMailsAllowedInsideFolder(selectedEntities, folderInfo.folder) &&
-					(this._mailView.cache.selectedFolder == null || !haveSameId(folderInfo.folder, this._mailView.cache.selectedFolder)),
-			)
-			.map((folderInfo) => {
-				return {
-					label: () => getIndentedFolderNameForDropdown(folderInfo),
-					click: this._actionBarAction((mails) =>
-						moveMails({
-							mailModel: locator.mailModel,
-							mails: mails,
-							targetMailFolder: folderInfo.folder,
-						}),
-					),
-					icon: getFolderIcon(folderInfo.folder),
-				}
-			})
+		})
 	}
 
 	/**

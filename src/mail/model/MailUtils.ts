@@ -19,7 +19,7 @@ import {
 	ReplyType,
 	TUTANOTA_MAIL_ADDRESS_DOMAINS,
 } from "../../api/common/TutanotaConstants"
-import { assertNotNull, contains, endsWith, first, neverNull, noOp, ofClass } from "@tutao/tutanota-utils"
+import { assertNotNull, contains, endsWith, neverNull, noOp, ofClass } from "@tutao/tutanota-utils"
 import { assertMainOrNode, isDesktop } from "../../api/common/Env"
 import { LockedError, NotFoundError } from "../../api/common/error/RestError"
 import type { LoginController } from "../../api/main/LoginController"
@@ -27,7 +27,6 @@ import type { Language, TranslationKey } from "../../misc/LanguageViewModel"
 import { lang } from "../../misc/LanguageViewModel"
 import { Icons } from "../../gui/base/icons/Icons"
 import type { MailboxDetail } from "./MailModel"
-import { MailModel } from "./MailModel"
 import type { AllIcons } from "../../gui/base/Icon"
 import type { GroupInfo, User } from "../../api/entities/sys/TypeRefs.js"
 import { CustomerPropertiesTypeRef } from "../../api/entities/sys/TypeRefs.js"
@@ -36,10 +35,11 @@ import type { EntityClient } from "../../api/common/EntityClient"
 import { getEnabledMailAddressesForGroupInfo, getGroupInfoDisplayName } from "../../api/common/utils/GroupUtils"
 import { fullNameToFirstAndLastName, mailAddressToFirstAndLastName } from "../../misc/parsing/MailAddressParser"
 import type { Attachment } from "../editor/SendMailModel"
-import { elementIdPart, getListId, listIdPart } from "../../api/common/utils/EntityUtils"
+import { elementIdPart, getListId, isSameId, listIdPart } from "../../api/common/utils/EntityUtils"
 import { isDetailsDraft, isLegacyMail, MailWrapper } from "../../api/common/MailWrapper.js"
 import { getLegacyMailHeaders, getMailHeaders } from "../../api/common/utils/Utils.js"
-import { FolderSystem } from "../../api/common/mail/FolderSystem.js"
+import { FolderSystem, IndentedFolder } from "../../api/common/mail/FolderSystem.js"
+import { MailModel } from "./MailModel"
 
 assertMainOrNode()
 export const LINE_BREAK = "<br>"
@@ -264,14 +264,6 @@ export function markMails(entityClient: EntityClient, mails: Mail[], unread: boo
 }
 
 /**
- * Check if all mails in the selection are drafts. If there are mixed drafts and non-drafts or the array is empty, return true.
- * @param mails
- */
-export function emptyOrContainsDraftsAndNonDrafts(mails: ReadonlyArray<Mail>): boolean {
-	return mails.length === 0 || (mails.some((mail) => mail.state === MailState.DRAFT) && mails.some((mail) => mail.state !== MailState.DRAFT))
-}
-
-/**
  * Return true if all mails in the array are allowed to go inside the folder (e.g. drafts can go in drafts but not inbox)
  * @param mails
  * @param folder
@@ -296,6 +288,39 @@ export function mailStateAllowedInsideFolderType(mailState: string, folderType: 
 	} else {
 		return folderType !== MailFolderType.DRAFT
 	}
+}
+
+/**
+ * Return the mailbox if all mails belong to the same mailbox and null otherwise
+ * @param mails
+ */
+function getMailsCommonMailbox(mailModel: MailModel, mails: Mail[]): MailboxDetail | null {
+	let selectedMailbox: MailboxDetail | null = null
+
+	for (const mail of mails) {
+		const mailBox = mailModel.getMailboxDetailsForMailSync(mail)
+
+		// We can't move if mails are from different mailboxes
+		if (selectedMailbox != null && selectedMailbox !== mailBox) {
+			return null
+		}
+
+		selectedMailbox = mailBox
+	}
+
+	return selectedMailbox
+}
+
+export function getMailMoveTargets(mailModel: MailModel, mails: Mail[]): IndentedFolder[] {
+	const commonMailbox = getMailsCommonMailbox(mailModel, mails)
+	if (commonMailbox == null) {
+		return []
+	}
+
+	return commonMailbox.folders.getIndentedList().filter((folderInfo) => {
+		// folder is allowed target and there are selected mails that are not in this folder (mails that are already in this folder will be ignored)
+		return allMailsAllowedInsideFolder(mails, folderInfo.folder) && mails.some((mail) => !isSameId(getListId(mail), folderInfo.folder.mails))
+	})
 }
 
 export function copyMailAddress({ address, name }: EncryptedMailAddress): EncryptedMailAddress {
@@ -386,14 +411,6 @@ export enum RecipientField {
 	TO = "to",
 	CC = "cc",
 	BCC = "bcc",
-}
-
-export async function getMoveTargetFolderSystems(model: MailModel, mails: Mail[]): Promise<{ level: number; folder: MailFolder }[]> {
-	const firstMail = first(mails)
-	if (firstMail == null) return []
-
-	const targetFolders = (await model.getMailboxDetailsForMail(firstMail)).folders.getIndentedList().filter((f) => f.folder.mails !== getListId(firstMail))
-	return targetFolders.filter((f) => allMailsAllowedInsideFolder([firstMail], f.folder))
 }
 
 export const MAX_FOLDER_INDENT_LEVEL = 10

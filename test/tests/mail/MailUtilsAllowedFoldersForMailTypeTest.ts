@@ -1,19 +1,31 @@
 import o from "ospec"
 import { createMail, createMailFolder, Mail, MailFolder } from "../../../src/api/entities/tutanota/TypeRefs.js"
-import { MailFolderType, MailState } from "../../../src/api/common/TutanotaConstants.js"
-import { allMailsAllowedInsideFolder, emptyOrContainsDraftsAndNonDrafts, mailStateAllowedInsideFolderType } from "../../../src/mail/model/MailUtils.js"
+import { getMailFolderType, MailFolderType, MailState } from "../../../src/api/common/TutanotaConstants.js"
+import { allMailsAllowedInsideFolder, getMailMoveTargets, mailStateAllowedInsideFolderType } from "../../../src/mail/model/MailUtils.js"
+import { MailboxDetail, MailModel } from "../../../src/mail/model/MailModel.js"
+import { matchers, object, when } from "testdouble"
+import { FolderSystem } from "../../../src/api/common/mail/FolderSystem.js"
+import { isSameTypeRef } from "@tutao/tutanota-utils"
+import no from "../../../src/translations/no.js"
 
-function createMailOfState(mailState: MailState): Mail {
-	return createMail({ state: mailState })
+function createMailOfStateInFolder(mailState: MailState, folderId: Id): Mail {
+	return createMail({ _id: [folderId, "mailId"], state: mailState })
 }
 
 function createMailFolderOfType(folderType: MailFolderType): MailFolder {
-	return createMailFolder({ folderType: folderType })
+	return createMailFolder({
+		_id: ["folderlistId", "folderId"],
+		folderType: folderType,
+		mails: folderType,
+	})
 }
 
 o.spec("MailUtilsAllowedFoldersForMailTypeTest", function () {
-	const draftMail = [createMailOfState(MailState.DRAFT), createMailOfState(MailState.DRAFT)]
-	const receivedMail = [createMailOfState(MailState.RECEIVED), createMailOfState(MailState.RECEIVED)]
+	const draftMail = [createMailOfStateInFolder(MailState.DRAFT, MailFolderType.DRAFT), createMailOfStateInFolder(MailState.DRAFT, MailFolderType.TRASH)]
+	const receivedMail = [
+		createMailOfStateInFolder(MailState.RECEIVED, MailFolderType.INBOX),
+		createMailOfStateInFolder(MailState.RECEIVED, MailFolderType.CUSTOM),
+	]
 	const allMail = [...draftMail, ...receivedMail]
 	const emptyMail = []
 
@@ -24,12 +36,22 @@ o.spec("MailUtilsAllowedFoldersForMailTypeTest", function () {
 	const archiveFolder = createMailFolderOfType(MailFolderType.ARCHIVE)
 	const spamFolder = createMailFolderOfType(MailFolderType.SPAM)
 	const draftFolder = createMailFolderOfType(MailFolderType.DRAFT)
+	const allFolders = [customFolder, inboxFolder, sentFolder, trashFolder, archiveFolder, spamFolder, draftFolder]
 
-	o("emptyOrContainsDraftsAndNonDrafts works", function () {
-		o(emptyOrContainsDraftsAndNonDrafts(emptyMail)).equals(true)
-		o(emptyOrContainsDraftsAndNonDrafts(allMail)).equals(true)
-		o(emptyOrContainsDraftsAndNonDrafts(draftMail)).equals(false)
-		o(emptyOrContainsDraftsAndNonDrafts(receivedMail)).equals(false)
+	let mailModelMock: MailModel
+	let mailboxDetailMock: Partial<MailboxDetail>
+	let otherMailboxDetailMock: Partial<MailboxDetail>
+
+	o.beforeEach(function () {
+		mailModelMock = object()
+		mailboxDetailMock = {
+			folders: new FolderSystem(allFolders),
+		}
+		otherMailboxDetailMock = {
+			folders: new FolderSystem([createMailFolderOfType(MailFolderType.INBOX)]),
+		}
+		when(mailModelMock.getMailboxDetailsForMailSync(matchers.argThat((mail) => allMail.includes(mail)))).thenReturn(mailboxDetailMock)
+		when(mailModelMock.getMailboxDetailsForMailSync(matchers.argThat((mail) => !allMail.includes(mail)))).thenReturn(otherMailboxDetailMock)
 	})
 
 	o("drafts can go in drafts but not inbox", function () {
@@ -89,5 +111,43 @@ o.spec("MailUtilsAllowedFoldersForMailTypeTest", function () {
 		o(allMailsAllowedInsideFolder(emptyMail, spamFolder)).equals(true)
 		o(allMailsAllowedInsideFolder(emptyMail, customFolder)).equals(true)
 		o(allMailsAllowedInsideFolder(emptyMail, archiveFolder)).equals(true)
+	})
+
+	o.spec("two mails from separate mailboxes can't be moved together", function () {
+		o("received mail from other mailbox", function () {
+			const possibleFolders = getMailMoveTargets(mailModelMock, [...allMail, ...[createMailOfStateInFolder(MailState.RECEIVED, MailFolderType.INBOX)]])
+			o(possibleFolders.length).equals(0)
+		})
+		o("draft from other mailbox", function () {
+			const possibleFolders = getMailMoveTargets(mailModelMock, [...allMail, ...[createMailOfStateInFolder(MailState.DRAFT, MailFolderType.DRAFT)]])
+			o(possibleFolders.length).equals(0)
+		})
+		o("sent mail from other mailbox", function () {
+			const noPossibleFoldersSent = getMailMoveTargets(mailModelMock, [...allMail, ...[createMailOfStateInFolder(MailState.SENT, MailFolderType.SENT)]])
+			o(noPossibleFoldersSent.length).equals(0)
+		})
+	})
+
+	o("draft and received email can be moved to trash", function () {
+		const possibleFolders = getMailMoveTargets(mailModelMock, allMail)
+		o(possibleFolders.length).equals(1)
+		o(possibleFolders.map((folderInfo) => folderInfo.folder)).deepEquals([trashFolder])
+	})
+
+	o("draft in drafts and draft in trash can be moved together to both drafts and trash", function () {
+		const possibleFolders = getMailMoveTargets(mailModelMock, draftMail)
+		o(possibleFolders.length).equals(2)
+		o(possibleFolders.every((folderInfo) => [trashFolder, draftFolder].includes(folderInfo.folder))).equals(true)
+	})
+
+	o("received emails in different folders can be moved to every folder even if already contained in the list except for drafts", function () {
+		const possibleFolders = getMailMoveTargets(mailModelMock, receivedMail)
+		const foldersWithoutDraft = allFolders.filter((folder) => folder.folderType !== MailFolderType.DRAFT)
+		o(possibleFolders.length).equals(allFolders.length - 1)
+		o(
+			possibleFolders.every((folderInfo) => {
+				return foldersWithoutDraft.includes(folderInfo.folder) && folderInfo.folder.folderType !== MailFolderType.DRAFT
+			}),
+		).equals(true)
 	})
 })

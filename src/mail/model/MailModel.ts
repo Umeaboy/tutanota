@@ -3,7 +3,7 @@ import stream from "mithril/stream"
 import Stream from "mithril/stream"
 import { containsEventOfType } from "../../api/common/utils/Utils"
 import { assertNotNull, groupBy, neverNull, noOp, ofClass, splitInChunks } from "@tutao/tutanota-utils"
-import type { Mail, MailBox, MailboxGroupRoot, MailboxProperties, MailFolder } from "../../api/entities/tutanota/TypeRefs.js"
+import type { Mail, MailBox, MailboxGroupRoot, MailboxProperties, MailDetails, MailFolder } from "../../api/entities/tutanota/TypeRefs.js"
 import {
 	createMailAddressProperties,
 	createMailboxProperties,
@@ -137,6 +137,14 @@ export class MailModel {
 	async getMailboxDetails(): Promise<Array<MailboxDetail>> {
 		await this.init()
 		return this.mailboxDetails()
+	}
+
+	getMailboxDetailsForMailSync(mail: Mail): MailboxDetail | null {
+		const mailboxDetails = this.mailboxDetails()
+		if (mailboxDetails == null) {
+			return null
+		}
+		return assertNotNull(mailboxDetails.find((md) => md.folders.getFolderByMailListId(getListId(mail))))
 	}
 
 	getMailboxDetailsForMail(mail: Mail): Promise<MailboxDetail> {
