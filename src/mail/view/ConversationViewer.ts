@@ -4,11 +4,12 @@ import { MailViewer } from "./MailViewer.js"
 import { lang } from "../../misc/LanguageViewModel.js"
 import { theme } from "../../gui/theme.js"
 import { Button, ButtonType } from "../../gui/base/Button.js"
-import { noOp } from "@tutao/tutanota-utils"
+import { lastThrow, noOp } from "@tutao/tutanota-utils"
 import { elementIdPart, getElementId, isSameId } from "../../api/common/utils/EntityUtils.js"
 import { MiniMailViewer } from "./MiniMailViewer.js"
 import { mailViewerMargin } from "./MailViewerUtils.js"
 import { MailViewerViewModel } from "./MailViewerViewModel.js"
+import { setMin } from "@tutao/tutanota-utils/dist/CollectionUtils.js"
 
 export interface ConversationViewerAttrs {
 	viewModel: ConversationViewModel
@@ -18,9 +19,10 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 	private primaryDom: HTMLElement | null = null
 	private containerDom: Element | null = null
 	private didScroll: { mail: IdTuple } | null = null
+	private orderedSubjects: string[] | null = null
+	private visibleSubjects: Set<number> = new Set()
 
 	view(vnode: Vnode<ConversationViewerAttrs>): Children {
-		let lastSubject = null
 		const itemsWithHeaders: Children[] = []
 		const viewModel = vnode.attrs.viewModel
 		if (this.didScroll && !isSameId(viewModel.mail._id, this.didScroll.mail)) {
@@ -40,13 +42,16 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 			)
 		}
 		const entries = viewModel.entries()
+		let lastSubject = null
+		const subjects: string[] = []
 		for (const entry of entries) {
 			switch (entry.type) {
 				case "mail": {
 					const mailViewModel = entry.viewModel
 					const normalizedSubject = this.normalizeSubject(mailViewModel.mail.subject)
 					if (normalizedSubject !== lastSubject) {
-						itemsWithHeaders.push(this.renderHeader(normalizedSubject))
+						itemsWithHeaders.push(this.renderHeader(normalizedSubject, subjects.length))
+						subjects.push(normalizedSubject)
 						lastSubject = normalizedSubject
 					}
 					const isPrimary = mailViewModel === viewModel.primaryViewModel()
@@ -60,6 +65,7 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 				}
 			}
 		}
+		this.orderedSubjects = subjects
 		itemsWithHeaders.push(m(".mt-l", { key: "footer" }))
 
 		return m(".fill-absolute.nav-bg", [
@@ -81,12 +87,20 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 				},
 				itemsWithHeaders,
 			),
-			// FIXME: last subject for now?
-			lastSubject && this.renderFloatingHeader(lastSubject),
+			lastSubject && this.renderFloatingHeader(),
 		])
 	}
 
-	private renderFloatingHeader(subject: string) {
+	private renderFloatingHeader() {
+		const minVisibleSubject = setMin(this.visibleSubjects)
+		if (this.orderedSubjects == null) return null
+		if (minVisibleSubject === 0) return null
+		let subjectToShow: string
+		if (minVisibleSubject == null) {
+			subjectToShow = lastThrow(this.orderedSubjects)
+		} else {
+			subjectToShow = this.orderedSubjects[minVisibleSubject - 1]
+		}
 		return m(
 			".abs.nav-bg",
 			{
@@ -106,7 +120,8 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 				{
 					// class: mailViewerMargin(),
 				},
-				subject,
+				subjectToShow,
+				// subject,
 				// "Test subject but much longer so that maybe it wraps and like the whole message in there, which maniac actually does this? Unbelievable",
 			),
 		)
@@ -147,17 +162,14 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 		)
 	}
 
-	private renderHeader(normalizedSubject: string): Children {
-		return m(
-			".h5.subject.text-break.selectable.b.flex-grow.mt-m",
-			{
-				class: mailViewerMargin(),
-				key: "item-subject" + normalizedSubject,
-				"aria-label": lang.get("subject_label") + ", " + (normalizedSubject || ""),
-				style: { marginTop: "12px" },
-			},
-			normalizedSubject,
-		)
+	private renderHeader(normalizedSubject: string, index: number): Children {
+		return m(ObservableSubject, {
+			subject: normalizedSubject,
+			index,
+			// FIXME
+			cb: (index, visible) => (visible ? this.visibleSubjects.add(index) : this.visibleSubjects.delete(index)),
+			key: "item-subject" + normalizedSubject,
+		})
 	}
 
 	private doScroll(viewModel: ConversationViewModel) {
@@ -178,6 +190,46 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 	private normalizeSubject(subject: string): string {
 		const match = subject.match(/^(?:(?:re|fwd):?\s*)*(.*)$/i)
 		return match ? match[1] : ""
+	}
+}
+
+interface ObservableSubjectAttrs {
+	index: number
+	cb: (index: number, visible: boolean) => unknown
+	subject: string
+}
+
+class ObservableSubject implements Component<ObservableSubjectAttrs> {
+	lastAttrs: ObservableSubjectAttrs
+
+	observer = new IntersectionObserver((entries) => {
+		const [entry] = entries
+		this.lastAttrs.cb(this.lastAttrs.index, entry.isIntersecting)
+		console.log("it's", entry.isIntersecting, this.lastAttrs.subject, this.lastAttrs.index)
+	})
+
+	constructor(vnode: Vnode<ObservableSubjectAttrs>) {
+		this.lastAttrs = vnode.attrs
+	}
+
+	view(vnode: Vnode<ObservableSubjectAttrs>): Children {
+		this.lastAttrs = vnode.attrs
+		return m(
+			".h5.subject.text-break.selectable.b.flex-grow.mt-m",
+			{
+				class: mailViewerMargin(),
+				"aria-label": lang.get("subject_label") + ", " + (this.lastAttrs.subject || ""),
+				style: { marginTop: "12px" },
+				oncreate: (vnode) => {
+					this.observer.observe(vnode.dom)
+				},
+				onremove: (vnode) => {
+					this.observer.unobserve(vnode.dom)
+					this.lastAttrs.cb(this.lastAttrs.index, false)
+				},
+			},
+			this.lastAttrs.subject,
+		)
 	}
 }
 
