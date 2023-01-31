@@ -28,7 +28,7 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 		if (this.didScroll && !isSameId(viewModel.mail._id, this.didScroll.mail)) {
 			this.didScroll = null
 		}
-		// this.doScroll(viewModel)
+		this.doScroll(viewModel)
 
 		if (viewModel.isConnectionLost()) {
 			return m(
@@ -180,9 +180,16 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 			// but why is it not attached if it's already next frame?
 
 			this.didScroll = { mail: viewModel.mail._id }
+
+			let scrollAmount = 0
+			const mailIndex = viewModel.getConversationIndexByMailId(viewModel.mail._id)
+			if (mailIndex && mailIndex > 0) {
+				// 66 is the height of the MiniMailViewer, with padding
+				scrollAmount = 66 * (mailIndex - 1)
+			}
 			requestAnimationFrame(() => {
-				// console.log("scrolling to", primaryDom.offsetTop, primaryDom.parentNode, stack)
-				containerDom.scrollTo({ top: primaryDom.offsetTop })
+				// note: we do not have to worry about scrolling too far, scrollTo will handle that
+				containerDom.scrollTo({ top: scrollAmount })
 			})
 		}
 	}
@@ -205,7 +212,6 @@ class ObservableSubject implements Component<ObservableSubjectAttrs> {
 	observer = new IntersectionObserver((entries) => {
 		const [entry] = entries
 		this.lastAttrs.cb(this.lastAttrs.index, entry.isIntersecting)
-		console.log("it's", entry.isIntersecting, this.lastAttrs.subject, this.lastAttrs.index)
 	})
 
 	constructor(vnode: Vnode<ObservableSubjectAttrs>) {
