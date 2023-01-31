@@ -52,6 +52,8 @@ export const enum Autocomplete {
 	newPassword = "new-password",
 	currentPassword = "current-password",
 	oneTimeCode = "one-time-code",
+	ccNumber = "cc-number",
+	ccCsc = "cc-csc",
 }
 
 export const inputLineHeight: number = size.font_size_base + 8
