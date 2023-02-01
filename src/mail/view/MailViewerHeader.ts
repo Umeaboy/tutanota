@@ -157,7 +157,7 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 				},
 			},
 			[
-				m(".small.flex.flex-wrap.items-start", [this.tutaoBadge(viewModel), m("span.text-break", getSenderAddressDisplay(viewModel.mail))]),
+				m(".small.flex.flex-wrap.items-start", [m("span.text-break", getSenderAddressDisplay(viewModel.mail))]),
 				m(".flex", [
 					this.getRecipientEmailAddress(attrs),
 					m(".flex-grow"),
@@ -237,7 +237,7 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 		// If the mail body failed to load, then we show a message in the main column
 		// If the mail body did load but not everything else, we show the message here
 		if (viewModel.isConnectionLost()) {
-			return m(InfoBanner, {
+			return m("." + mailViewerMargin(), m(InfoBanner, {
 				message: "mailPartsNotLoaded_msg",
 				icon: Icons.Warning,
 				buttons: [
@@ -246,7 +246,7 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 						click: () => viewModel.loadAll(),
 					},
 				],
-			})
+			}))
 		} else {
 			return null
 		}

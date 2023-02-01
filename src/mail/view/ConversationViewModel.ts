@@ -130,20 +130,16 @@ export class ConversationViewModel {
 	conversation: ConversationItem[] | null = null
 
 	private async loadConversation() {
-		const conversationEntries = await this.entityClient.loadAll(ConversationEntryTypeRef, listIdPart(this.mail.conversationEntry))
-		const byList = groupBy(conversationEntries, (c) => c.mail && listIdPart(c.mail))
-		const allMails: Map<Id, Mail> = new Map()
-		for (const [listId, conversations] of byList.entries()) {
-			if (!listId) continue
-			const loaded = await this.entityClient.loadMultiple(
-				MailTypeRef,
-				listId,
-				conversations.map((c) => elementIdPart(assertNotNull(c.mail))),
-			)
-			for (const mail of loaded) {
-				allMails.set(getElementId(mail), mail)
-			}
+		try {
+			const conversationEntries = await this.entityClient.loadAll(ConversationEntryTypeRef, listIdPart(this.mail.conversationEntry))
+			const allMails = await this.loadMails(conversationEntries)
+			this.conversation = this.createConversationEntries(conversationEntries, allMails)
+		} finally {
+			this.onUiUpdate()
 		}
+	}
+
+	private createConversationEntries(conversationEntries: ConversationEntry[], allMails: Map<Id, Mail>) {
 		const newConversation: ConversationItem[] = []
 		let previousSubject: string | null = null
 		for (const c of conversationEntries) {
@@ -164,8 +160,24 @@ export class ConversationViewModel {
 				newConversation.push({ type: "deleted", entry: c })
 			}
 		}
-		this.conversation = newConversation
-		this.onUiUpdate()
+		return newConversation
+	}
+
+	private async loadMails(conversationEntries: ConversationEntry[]) {
+		const byList = groupBy(conversationEntries, (c) => c.mail && listIdPart(c.mail))
+		const allMails: Map<Id, Mail> = new Map()
+		for (const [listId, conversations] of byList.entries()) {
+			if (!listId) continue
+			const loaded = await this.entityClient.loadMultiple(
+				MailTypeRef,
+				listId,
+				conversations.map((c) => elementIdPart(assertNotNull(c.mail))),
+			)
+			for (const mail of loaded) {
+				allMails.set(getElementId(mail), mail)
+			}
+		}
+		return allMails
 	}
 
 	/**
@@ -199,6 +211,12 @@ export class ConversationViewModel {
 
 	isConnectionLost(): boolean {
 		return this.loadingState.isConnectionLost()
+	}
+
+	retry() {
+		if (this.loadingState.isConnectionLost()) {
+			this.loadingState.trackPromise(this.loadConversation())
+		}
 	}
 
 	private normalizeSubject(subject: string): string {

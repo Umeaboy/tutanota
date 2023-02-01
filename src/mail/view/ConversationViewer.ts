@@ -33,17 +33,6 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 		}
 		this.doScroll(viewModel)
 
-		if (viewModel.isConnectionLost()) {
-			return m(
-				".center",
-				m(Button, {
-					type: ButtonType.Secondary,
-					label: "retry_action",
-					// fixme
-					click: () => noOp(),
-				}),
-			)
-		}
 		const entries = viewModel.entries()
 		this.lastItems = entries
 		for (const entry of entries) {
@@ -66,8 +55,6 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 			}
 		}
 
-		itemsWithHeaders.push(m(".mt-l", { key: "footer" }))
-
 		return m(".fill-absolute.nav-bg", [
 			m(
 				".fill-absolute.scroll",
@@ -82,6 +69,27 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 					},
 				},
 				itemsWithHeaders,
+				viewModel.isConnectionLost()
+					? m(
+							".center",
+							m(Button, {
+								type: ButtonType.Secondary,
+								label: "retry_action",
+								click: () => viewModel.retry(),
+							}),
+					  )
+					: !viewModel.isFinished()
+					? m(
+							".font-weight-600.center.mt-l" + "." + mailViewerMargin(),
+							{
+								style: {
+									color: theme.content_button,
+								},
+							},
+							lang.get("loading_msg"),
+					  )
+					: null,
+				m(".mt-l"),
 			),
 			this.renderFloatingHeader(),
 		])
