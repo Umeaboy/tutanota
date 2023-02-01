@@ -2,7 +2,7 @@ import { ConversationEntry, ConversationEntryTypeRef, Mail, MailTypeRef } from "
 import { MailViewerViewModel } from "./MailViewerViewModel.js"
 import { CreateMailViewerOptions } from "./MailViewer.js"
 import { elementIdPart, getElementId, haveSameId, isSameId, listIdPart } from "../../api/common/utils/EntityUtils.js"
-import { assertNotNull, groupBy } from "@tutao/tutanota-utils"
+import { assertNotNull, findLast, groupBy } from "@tutao/tutanota-utils"
 import { EntityClient } from "../../api/common/EntityClient.js"
 import { LoadingStateTracker } from "../../offline/LoadingState.js"
 import { EntityEventsListener, EntityUpdateData, EventController, isUpdateForTypeRef } from "../../api/main/EventController.js"
@@ -12,8 +12,9 @@ import { NotFoundError } from "../../api/common/error/RestError.js"
 export type MailViewerViewModelFactory = (options: CreateMailViewerOptions) => MailViewerViewModel
 
 export type MailItem = { type: "mail"; viewModel: MailViewerViewModel }
+export type SubjectItem = { type: "subject"; subject: string; id: string }
 export type UnknownItem = { type: "deleted"; entry: ConversationEntry }
-export type ConversationItem = MailItem | UnknownItem
+export type ConversationItem = MailItem | SubjectItem | UnknownItem
 
 export class ConversationViewModel {
 	private readonly _primaryViewModel: MailViewerViewModel
@@ -68,9 +69,14 @@ export class ConversationViewModel {
 				// already loaded
 				return
 			}
+			// FIXME: find the position for it
 			try {
 				const mail = await this.entityClient.load(MailTypeRef, entry.mail)
-				// FIXME: find the place for it
+				const newSubject = this.normalizeSubject(mail.subject)
+				const lastSubject = findLast(conversation, (c) => c.type === "subject") as SubjectItem | null
+				if (newSubject !== lastSubject?.subject) {
+					conversation.push({ type: "subject", subject: newSubject, id: getElementId(mail) })
+				}
 				conversation.push({ type: "mail", viewModel: this.viewModelFactory({ ...this.options, mail }) })
 				this.onUiUpdate()
 			} catch (e) {
@@ -138,15 +144,27 @@ export class ConversationViewModel {
 				allMails.set(getElementId(mail), mail)
 			}
 		}
-		this.conversation = conversationEntries.map((c) => {
+		const newConversation: ConversationItem[] = []
+		let previousSubject: string | null = null
+		for (const c of conversationEntries) {
 			const mail = c.mail && allMails.get(elementIdPart(c.mail))
-			return mail
-				? {
-						type: "mail",
-						viewModel: isSameId(mail._id, this.options.mail._id) ? this._primaryViewModel : this.viewModelFactory({ ...this.options, mail }),
-				  }
-				: { type: "deleted", entry: c }
-		})
+
+			if (mail) {
+				const subject = this.normalizeSubject(mail.subject)
+				if (subject !== previousSubject) {
+					previousSubject = subject
+					newConversation.push({ type: "subject", subject: subject, id: getElementId(mail) })
+				}
+
+				newConversation.push({
+					type: "mail",
+					viewModel: isSameId(mail._id, this.options.mail._id) ? this._primaryViewModel : this.viewModelFactory({ ...this.options, mail }),
+				})
+			} else {
+				newConversation.push({ type: "deleted", entry: c })
+			}
+		}
+		this.conversation = newConversation
 		this.onUiUpdate()
 	}
 
@@ -159,7 +177,12 @@ export class ConversationViewModel {
 	}
 
 	entries(): ReadonlyArray<ConversationItem> {
-		return this.conversation ?? [{ type: "mail", viewModel: this._primaryViewModel }]
+		return (
+			this.conversation ?? [
+				{ type: "subject", subject: this.normalizeSubject(this._primaryViewModel.mail.subject), id: getElementId(this._primaryViewModel.mail) },
+				{ type: "mail", viewModel: this._primaryViewModel },
+			]
+		)
 	}
 
 	get mail(): Mail {
@@ -176,6 +199,11 @@ export class ConversationViewModel {
 
 	isConnectionLost(): boolean {
 		return this.loadingState.isConnectionLost()
+	}
+
+	private normalizeSubject(subject: string): string {
+		const match = subject.match(/^(?:(?:re|fwd):?\s*)*(.*)$/i)
+		return match ? match[1] : ""
 	}
 
 	dispose() {

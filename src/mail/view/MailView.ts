@@ -149,6 +149,7 @@ export class MailView extends BaseTopLevelView implements TopLevelView<MailViewA
 						".mail",
 						this.conversationViewModel != null
 							? m(ConversationViewer, {
+									key: getElementId(this.conversationViewModel.mail),
 									viewModel: this.conversationViewModel,
 							  })
 							: m(this.multiMailViewer),

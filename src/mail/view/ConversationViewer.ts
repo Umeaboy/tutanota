@@ -1,15 +1,15 @@
 import m, { Children, Component, Vnode, VnodeDOM } from "mithril"
-import { ConversationViewModel } from "./ConversationViewModel.js"
+import { ConversationItem, ConversationViewModel, SubjectItem } from "./ConversationViewModel.js"
 import { MailViewer } from "./MailViewer.js"
 import { lang } from "../../misc/LanguageViewModel.js"
 import { theme } from "../../gui/theme.js"
 import { Button, ButtonType } from "../../gui/base/Button.js"
-import { assertNotNull, last, lastThrow, noOp } from "@tutao/tutanota-utils"
+import { assertNotNull, noOp } from "@tutao/tutanota-utils"
 import { elementIdPart, getElementId, isSameId } from "../../api/common/utils/EntityUtils.js"
 import { MiniMailViewer } from "./MiniMailViewer.js"
 import { mailViewerMargin } from "./MailViewerUtils.js"
 import { MailViewerViewModel } from "./MailViewerViewModel.js"
-import { setMax, setMin } from "@tutao/tutanota-utils/dist/CollectionUtils.js"
+import { max } from "@tutao/tutanota-utils/dist/CollectionUtils.js"
 import { px } from "../../gui/size.js"
 
 export interface ConversationViewerAttrs {
@@ -21,19 +21,9 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 	private containerDom: Element | null = null
 	private floatingSubjectDom: HTMLElement | null = null
 	private didScroll: { mail: IdTuple } | null = null
-	private orderedSubjects: string[] | null = null
-	// this does not work and will not work
-	// it is not enough to know is the subject is visible or not, we also need to know if it's above and below the viewport. Consider the scenario where
-	// no subject is visible on the screen because we are in the middle of the long email. We need to show the subject above the current email but we don't
-	// know which one it is because we are unaware of our current position.
-
-	// We can listen to `scroll` events and detect the visible child on our own by comparing the coordinates perhaps?
-	// Otherwise, we can try to attach intersectionObserver to every single item in the list, this will give us an idea of what the first visible item is
-	// which tells us where we are in the list and what is the first *in*visible subject.
-	// At any rate we shouldn't redraw on scroll.
-	//
-	// OR we could keep track of what's above/below by boundingClientRect from IntersectionObserver!
-	private subjectsAboveViewport: Set<number> = new Set()
+	private lastItems: readonly ConversationItem[] | null = null
+	/** ids of the subject entries above the currently visible items. */
+	private subjectsAboveViewport: Set<string> = new Set()
 
 	view(vnode: Vnode<ConversationViewerAttrs>): Children {
 		const itemsWithHeaders: Children[] = []
@@ -55,21 +45,18 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 			)
 		}
 		const entries = viewModel.entries()
-		let lastSubject = null
-		const subjects: string[] = []
+		this.lastItems = entries
 		for (const entry of entries) {
 			switch (entry.type) {
 				case "mail": {
 					const mailViewModel = entry.viewModel
-					const normalizedSubject = this.normalizeSubject(mailViewModel.mail.subject)
-					if (normalizedSubject !== lastSubject) {
-						itemsWithHeaders.push(this.renderHeader(normalizedSubject, subjects.length))
-						subjects.push(normalizedSubject)
-						lastSubject = normalizedSubject
-					}
 					const isPrimary = mailViewModel === viewModel.primaryViewModel()
 
 					itemsWithHeaders.push(this.renderViewer(mailViewModel, isPrimary, viewModel))
+					break
+				}
+				case "subject": {
+					itemsWithHeaders.push(this.renderHeader(entry.subject, entry.id))
 					break
 				}
 				case "deleted": {
@@ -78,7 +65,7 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 				}
 			}
 		}
-		this.orderedSubjects = subjects
+
 		itemsWithHeaders.push(m(".mt-l", { key: "footer" }))
 
 		return m(".fill-absolute.nav-bg", [
@@ -96,7 +83,7 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 				},
 				itemsWithHeaders,
 			),
-			lastSubject && this.renderFloatingHeader(),
+			this.renderFloatingHeader(),
 		])
 	}
 
@@ -163,26 +150,26 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 		)
 	}
 
-	private renderHeader(normalizedSubject: string, index: number): Children {
+	private renderHeader(normalizedSubject: string, id: string): Children {
 		return m(ObservableSubject, {
 			subject: normalizedSubject,
-			index,
+			id: id,
 			// FIXME
-			cb: (index, visiblity) => this.onSubjectVisible(index, visiblity),
+			cb: (index, visiblity) => this.onSubjectVisible(id, visiblity),
 			key: "item-subject" + normalizedSubject,
 		})
 	}
 
-	private onSubjectVisible(index: number, visibility: SubjectVisiblity) {
+	private onSubjectVisible(id: string, visibility: SubjectVisiblity) {
 		switch (visibility) {
 			case "visible":
-				this.subjectsAboveViewport.delete(index)
+				this.subjectsAboveViewport.delete(id)
 				break
 			case "above":
-				this.subjectsAboveViewport.add(index)
+				this.subjectsAboveViewport.add(id)
 				break
 			case "below":
-				this.subjectsAboveViewport.delete(index)
+				this.subjectsAboveViewport.delete(id)
 				break
 		}
 		if (this.floatingSubjectDom) {
@@ -197,10 +184,12 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 	}
 
 	private subjectForStickyHeader(): string | null {
-		console.log("subject for sticky", Array.from(this.subjectsAboveViewport))
-		const lastInvisibleSubject = setMax(this.subjectsAboveViewport)
-		if (this.orderedSubjects == null || lastInvisibleSubject == null) return null
-		return this.orderedSubjects[lastInvisibleSubject]
+		const entries = this.lastItems
+		if (!entries) return null
+		// knowingly N^2
+		const lastInvisibleSubject = max(Array.from(this.subjectsAboveViewport).map((id) => entries.findIndex((e) => e.type === "subject" && e.id === id)))
+		if (lastInvisibleSubject == null) return null
+		return (entries[lastInvisibleSubject] as SubjectItem).subject
 	}
 
 	private doScroll(viewModel: ConversationViewModel) {
@@ -224,18 +213,13 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 			})
 		}
 	}
-
-	private normalizeSubject(subject: string): string {
-		const match = subject.match(/^(?:(?:re|fwd):?\s*)*(.*)$/i)
-		return match ? match[1] : ""
-	}
 }
 
 type SubjectVisiblity = "above" | "below" | "visible"
 
 interface ObservableSubjectAttrs {
-	index: number
-	cb: (index: number, visibility: SubjectVisiblity) => unknown
+	id: string
+	cb: (id: string, visibility: SubjectVisiblity) => unknown
 	subject: string
 }
 
@@ -265,7 +249,7 @@ class ObservableSubject implements Component<ObservableSubjectAttrs> {
 								: entry.boundingClientRect.bottom < assertNotNull(entry.rootBounds).top
 								? "above"
 								: "below"
-							this.lastAttrs.cb(this.lastAttrs.index, visibility)
+							this.lastAttrs.cb(this.lastAttrs.id, visibility)
 						},
 						{ root: vnode.dom.parentElement },
 					)
