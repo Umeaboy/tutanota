@@ -4,7 +4,7 @@ import { MailViewer } from "./MailViewer.js"
 import { lang } from "../../misc/LanguageViewModel.js"
 import { theme } from "../../gui/theme.js"
 import { Button, ButtonType } from "../../gui/base/Button.js"
-import { assertNotNull, noOp } from "@tutao/tutanota-utils"
+import { assertNotNull } from "@tutao/tutanota-utils"
 import { elementIdPart, getElementId, isSameId } from "../../api/common/utils/EntityUtils.js"
 import { MiniMailViewer } from "./MiniMailViewer.js"
 import { mailViewerMargin } from "./MailViewerUtils.js"
@@ -18,7 +18,7 @@ export interface ConversationViewerAttrs {
 
 export class ConversationViewer implements Component<ConversationViewerAttrs> {
 	private primaryDom: HTMLElement | null = null
-	private containerDom: Element | null = null
+	private containerDom: HTMLElement | null = null
 	private floatingSubjectDom: HTMLElement | null = null
 	private didScroll: { mail: IdTuple } | null = null
 	private lastItems: readonly ConversationItem[] | null = null
@@ -60,39 +60,46 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 				".fill-absolute.scroll",
 				{
 					oncreate: (vnode) => {
-						console.log("create container")
-						this.containerDom = vnode.dom
-						// this.doScroll(viewModel)
+						this.containerDom = vnode.dom as HTMLElement
 					},
 					onremove: () => {
 						console.log("remove container")
 					},
 				},
 				itemsWithHeaders,
-				viewModel.isConnectionLost()
-					? m(
-							".center",
-							m(Button, {
-								type: ButtonType.Secondary,
-								label: "retry_action",
-								click: () => viewModel.retry(),
-							}),
-					  )
-					: !viewModel.isFinished()
-					? m(
-							".font-weight-600.center.mt-l" + "." + mailViewerMargin(),
-							{
-								style: {
-									color: theme.content_button,
-								},
-							},
-							lang.get("loading_msg"),
-					  )
-					: null,
-				m(".mt-l"),
+				this.renderLoadingState(viewModel),
+				m(".mt-l", {
+					style: {
+						// Having more room at the bottom allows the last email to be scrolled up more, which is nice
+						height: "400px",
+					},
+				}),
 			),
 			this.renderFloatingHeader(),
 		])
+	}
+
+	private renderLoadingState(viewModel: ConversationViewModel) {
+		return viewModel.isConnectionLost()
+			? m(
+					".center",
+					m(Button, {
+						type: ButtonType.Secondary,
+						label: "retry_action",
+						click: () => viewModel.retry(),
+					}),
+			  )
+			: !viewModel.isFinished()
+			? m(
+					".font-weight-600.center.mt-l" + "." + mailViewerMargin(),
+					{
+						style: {
+							color: theme.content_button,
+						},
+					},
+					lang.get("loading_msg"),
+			  )
+			: null
 	}
 
 	private renderFloatingHeader() {
@@ -131,9 +138,7 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 				key: elementIdPart(mailViewModel.mail.conversationEntry),
 				oncreate: (vnode: VnodeDOM) => {
 					if (isPrimary) {
-						console.log("create primary")
 						this.primaryDom = vnode.dom as HTMLElement
-						// this.doScroll(viewModel)
 					}
 				},
 				onremove: () => {
@@ -204,21 +209,18 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 		const primaryDom = this.primaryDom
 		const containerDom = this.containerDom
 		if (!this.didScroll && primaryDom && containerDom && viewModel.isFinished()) {
-			// we say that we *did* scroll even if it would be too early (primaryDom is not attached?)
-			// but why is it not attached if it's already next frame?
+			let mailIndex = viewModel.getConversationIndexByMailId(viewModel.mail._id)
 
-			this.didScroll = { mail: viewModel.mail._id }
-
-			let scrollAmount = 0
-			const mailIndex = viewModel.getConversationIndexByMailId(viewModel.mail._id)
 			if (mailIndex && mailIndex > 0) {
-				// 66 is the height of the MiniMailViewer, with padding
-				scrollAmount = 66 * (mailIndex - 1)
+				// If the item before the primary mail is a subject use that as a scroll target
+				const itemIndex = assertNotNull(viewModel.conversation)[mailIndex - 1].type === "subject" ? mailIndex - 1 : mailIndex
+				this.didScroll = { mail: viewModel.mail._id }
+				requestAnimationFrame(() => {
+					const top = (containerDom.childNodes[itemIndex] as HTMLElement).offsetTop
+					// 46 for the floating header
+					containerDom.scrollTo({ top: top - 46 })
+				})
 			}
-			requestAnimationFrame(() => {
-				// note: we do not have to worry about scrolling too far, scrollTo will handle that
-				containerDom.scrollTo({ top: scrollAmount })
-			})
 		}
 	}
 }
