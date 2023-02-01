@@ -284,7 +284,7 @@ class ObservableSubject implements Component<ObservableSubjectAttrs> {
 class UnknownMailView implements Component {
 	view() {
 		return m(
-			".center.pt.pb.font-weight-600.border-radius-big.mt-m",
+			".center.pt-s.pb-s.font-weight-600.border-radius-big.mt-m",
 			{
 				class: mailViewerMargin(),
 				style: {
