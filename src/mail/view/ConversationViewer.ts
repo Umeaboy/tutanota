@@ -4,12 +4,13 @@ import { MailViewer } from "./MailViewer.js"
 import { lang } from "../../misc/LanguageViewModel.js"
 import { theme } from "../../gui/theme.js"
 import { Button, ButtonType } from "../../gui/base/Button.js"
-import { lastThrow, noOp } from "@tutao/tutanota-utils"
+import { assertNotNull, last, lastThrow, noOp } from "@tutao/tutanota-utils"
 import { elementIdPart, getElementId, isSameId } from "../../api/common/utils/EntityUtils.js"
 import { MiniMailViewer } from "./MiniMailViewer.js"
 import { mailViewerMargin } from "./MailViewerUtils.js"
 import { MailViewerViewModel } from "./MailViewerViewModel.js"
-import { setMin } from "@tutao/tutanota-utils/dist/CollectionUtils.js"
+import { setMax, setMin } from "@tutao/tutanota-utils/dist/CollectionUtils.js"
+import { px } from "../../gui/size.js"
 
 export interface ConversationViewerAttrs {
 	viewModel: ConversationViewModel
@@ -18,9 +19,21 @@ export interface ConversationViewerAttrs {
 export class ConversationViewer implements Component<ConversationViewerAttrs> {
 	private primaryDom: HTMLElement | null = null
 	private containerDom: Element | null = null
+	private floatingSubjectDom: HTMLElement | null = null
 	private didScroll: { mail: IdTuple } | null = null
 	private orderedSubjects: string[] | null = null
-	private visibleSubjects: Set<number> = new Set()
+	// this does not work and will not work
+	// it is not enough to know is the subject is visible or not, we also need to know if it's above and below the viewport. Consider the scenario where
+	// no subject is visible on the screen because we are in the middle of the long email. We need to show the subject above the current email but we don't
+	// know which one it is because we are unaware of our current position.
+
+	// We can listen to `scroll` events and detect the visible child on our own by comparing the coordinates perhaps?
+	// Otherwise, we can try to attach intersectionObserver to every single item in the list, this will give us an idea of what the first visible item is
+	// which tells us where we are in the list and what is the first *in*visible subject.
+	// At any rate we shouldn't redraw on scroll.
+	//
+	// OR we could keep track of what's above/below by boundingClientRect from IntersectionObserver!
+	private subjectsAboveViewport: Set<number> = new Set()
 
 	view(vnode: Vnode<ConversationViewerAttrs>): Children {
 		const itemsWithHeaders: Children[] = []
@@ -80,10 +93,6 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 					onremove: () => {
 						console.log("remove container")
 					},
-					// should probably use intersection observer to detect which subject is visible instead
-					onscroll: (event: Event) => {
-						// FIXME do not redraw all the time maybe
-					},
 				},
 				itemsWithHeaders,
 			),
@@ -92,15 +101,6 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 	}
 
 	private renderFloatingHeader() {
-		const minVisibleSubject = setMin(this.visibleSubjects)
-		if (this.orderedSubjects == null) return null
-		if (minVisibleSubject === 0) return null
-		let subjectToShow: string
-		if (minVisibleSubject == null) {
-			subjectToShow = lastThrow(this.orderedSubjects)
-		} else {
-			subjectToShow = this.orderedSubjects[minVisibleSubject - 1]
-		}
 		return m(
 			".abs.nav-bg",
 			{
@@ -112,17 +112,18 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 					right: 0,
 					borderBottom: `1px solid ${theme.list_border}`,
 					transition: `200ms ease-in-out`,
-					transform: this.containerDom && this.containerDom.scrollTop > 40 ? "translateY(0)" : "translateY(-40px)",
+					// FIXME: why 40?
+					transform: "translateY(-40px)",
 				},
 			},
 			m(
 				".b.subject.text-break.pt-s.pb-s.text-ellipsis",
 				{
-					// class: mailViewerMargin(),
+					oncreate: ({ dom }) => {
+						this.floatingSubjectDom = dom as HTMLElement
+					},
 				},
-				subjectToShow,
-				// subject,
-				// "Test subject but much longer so that maybe it wraps and like the whole message in there, which maniac actually does this? Unbelievable",
+				"",
 			),
 		)
 	}
@@ -167,9 +168,39 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 			subject: normalizedSubject,
 			index,
 			// FIXME
-			cb: (index, visible) => (visible ? this.visibleSubjects.add(index) : this.visibleSubjects.delete(index)),
+			cb: (index, visiblity) => this.onSubjectVisible(index, visiblity),
 			key: "item-subject" + normalizedSubject,
 		})
+	}
+
+	private onSubjectVisible(index: number, visibility: SubjectVisiblity) {
+		switch (visibility) {
+			case "visible":
+				this.subjectsAboveViewport.delete(index)
+				break
+			case "above":
+				this.subjectsAboveViewport.add(index)
+				break
+			case "below":
+				this.subjectsAboveViewport.delete(index)
+				break
+		}
+		if (this.floatingSubjectDom) {
+			if (this.subjectsAboveViewport.size === 0) {
+				// all subjects above us are visible, hide the sticky subject
+				this.floatingSubjectDom.parentElement!.style.transform = `translateY(${px(-this.floatingSubjectDom.offsetHeight)})`
+			} else {
+				this.floatingSubjectDom.parentElement!.style.transform = ""
+				this.floatingSubjectDom.innerText = this.subjectForStickyHeader() ?? ""
+			}
+		}
+	}
+
+	private subjectForStickyHeader(): string | null {
+		console.log("subject for sticky", Array.from(this.subjectsAboveViewport))
+		const lastInvisibleSubject = setMax(this.subjectsAboveViewport)
+		if (this.orderedSubjects == null || lastInvisibleSubject == null) return null
+		return this.orderedSubjects[lastInvisibleSubject]
 	}
 
 	private doScroll(viewModel: ConversationViewModel) {
@@ -200,19 +231,18 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 	}
 }
 
+type SubjectVisiblity = "above" | "below" | "visible"
+
 interface ObservableSubjectAttrs {
 	index: number
-	cb: (index: number, visible: boolean) => unknown
+	cb: (index: number, visibility: SubjectVisiblity) => unknown
 	subject: string
 }
 
 class ObservableSubject implements Component<ObservableSubjectAttrs> {
 	lastAttrs: ObservableSubjectAttrs
 
-	observer = new IntersectionObserver((entries) => {
-		const [entry] = entries
-		this.lastAttrs.cb(this.lastAttrs.index, entry.isIntersecting)
-	})
+	observer: IntersectionObserver | null = null
 
 	constructor(vnode: Vnode<ObservableSubjectAttrs>) {
 		this.lastAttrs = vnode.attrs
@@ -227,11 +257,23 @@ class ObservableSubject implements Component<ObservableSubjectAttrs> {
 				"aria-label": lang.get("subject_label") + ", " + (this.lastAttrs.subject || ""),
 				style: { marginTop: "12px" },
 				oncreate: (vnode) => {
+					this.observer = new IntersectionObserver(
+						(entries) => {
+							const [entry] = entries
+							const visibility = entry.isIntersecting
+								? "visible"
+								: entry.boundingClientRect.bottom < assertNotNull(entry.rootBounds).top
+								? "above"
+								: "below"
+							this.lastAttrs.cb(this.lastAttrs.index, visibility)
+						},
+						{ root: vnode.dom.parentElement },
+					)
 					this.observer.observe(vnode.dom)
 				},
 				onremove: (vnode) => {
-					this.observer.unobserve(vnode.dom)
-					this.lastAttrs.cb(this.lastAttrs.index, false)
+					this.observer?.unobserve(vnode.dom)
+					// this.lastAttrs.cb(this.lastAttrs.index, false)
 				},
 			},
 			this.lastAttrs.subject,
