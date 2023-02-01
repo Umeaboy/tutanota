@@ -41,7 +41,6 @@ assertMainOrNode()
 // map of inline image cid to InlineImageReference
 export type InlineImages = Map<string, InlineImageReference>
 
-const SCROLL_FACTOR = 4 / 5
 const DOUBLE_TAP_TIME_MS = 350
 
 type MailAddressAndName = {
@@ -462,26 +461,6 @@ export class MailViewer implements Component<MailViewerAttrs> {
 				enabled: () => !this.viewModel.isDraftMail(),
 				help: "replyAll_action",
 			},
-			{
-				key: Keys.PAGE_UP,
-				exec: () => this.scrollUp(),
-				help: "scrollUp_action",
-			},
-			{
-				key: Keys.PAGE_DOWN,
-				exec: () => this.scrollDown(),
-				help: "scrollDown_action",
-			},
-			{
-				key: Keys.HOME,
-				exec: () => this.scrollToTop(),
-				help: "scrollToTop_action",
-			},
-			{
-				key: Keys.END,
-				exec: () => this.scrollToBottom(),
-				help: "scrollToBottom_action",
-			},
 		]
 
 		if (userController.isInternalUser()) {
@@ -649,51 +628,6 @@ export class MailViewer implements Component<MailViewerAttrs> {
 				}),
 			)
 		})
-	}
-
-	private scrollUp(): void {
-		this.scrollIfDomBody((dom) => {
-			const current = dom.scrollTop
-			const toScroll = dom.clientHeight * SCROLL_FACTOR
-			return scroll(current, Math.max(0, current - toScroll))
-		})
-	}
-
-	private scrollDown(): void {
-		this.scrollIfDomBody((dom) => {
-			const current = dom.scrollTop
-			const toScroll = dom.clientHeight * SCROLL_FACTOR
-			return scroll(current, Math.min(dom.scrollHeight - dom.offsetHeight, dom.scrollTop + toScroll))
-		})
-	}
-
-	private scrollToTop(): void {
-		this.scrollIfDomBody((dom) => {
-			return scroll(dom.scrollTop, 0)
-		})
-	}
-
-	private scrollToBottom(): void {
-		this.scrollIfDomBody((dom) => {
-			const end = dom.scrollHeight - dom.offsetHeight
-			return scroll(dom.scrollTop, end)
-		})
-	}
-
-	private scrollIfDomBody(cb: (dom: HTMLElement) => DomMutation) {
-		if (this.scrollDom) {
-			const dom = this.scrollDom
-
-			if (!this.scrollAnimation) {
-				this.scrollAnimation = animations
-					.add(dom, cb(dom), {
-						easing: ease.inOut,
-					})
-					.then(() => {
-						this.scrollAnimation = null
-					})
-			}
-		}
 	}
 
 	private handleAnchorClick(event: Event, href: string | null, shouldDispatchSyntheticClick: boolean): void {

@@ -5,55 +5,65 @@ import { lang } from "../../misc/LanguageViewModel.js"
 import { theme } from "../../gui/theme.js"
 import { Button, ButtonType } from "../../gui/base/Button.js"
 import { assertNotNull } from "@tutao/tutanota-utils"
-import { elementIdPart, getElementId, isSameId } from "../../api/common/utils/EntityUtils.js"
+import { elementIdPart, getElementId } from "../../api/common/utils/EntityUtils.js"
 import { MiniMailViewer } from "./MiniMailViewer.js"
 import { mailViewerMargin } from "./MailViewerUtils.js"
 import { MailViewerViewModel } from "./MailViewerViewModel.js"
 import { max } from "@tutao/tutanota-utils/dist/CollectionUtils.js"
 import { px } from "../../gui/size.js"
+import { Keys } from "../../api/common/TutanotaConstants.js"
+import { keyManager, Shortcut } from "../../misc/KeyManager.js"
 
 export interface ConversationViewerAttrs {
 	viewModel: ConversationViewModel
 }
 
+const SCROLL_FACTOR = 4 / 5
+
 export class ConversationViewer implements Component<ConversationViewerAttrs> {
 	private primaryDom: HTMLElement | null = null
 	private containerDom: HTMLElement | null = null
 	private floatingSubjectDom: HTMLElement | null = null
-	private didScroll: { mail: IdTuple } | null = null
+	private didScroll = false
 	private lastItems: readonly ConversationItem[] | null = null
 	/** ids of the subject entries above the currently visible items. */
 	private subjectsAboveViewport: Set<string> = new Set()
 
+	private readonly shortcuts: Shortcut[] = [
+		{
+			key: Keys.PAGE_UP,
+			exec: () => this.scrollUp(),
+			help: "scrollUp_action",
+		},
+		{
+			key: Keys.PAGE_DOWN,
+			exec: () => this.scrollDown(),
+			help: "scrollDown_action",
+		},
+		{
+			key: Keys.HOME,
+			exec: () => this.scrollToTop(),
+			help: "scrollToTop_action",
+		},
+		{
+			key: Keys.END,
+			exec: () => this.scrollToBottom(),
+			help: "scrollToBottom_action",
+		},
+	]
+
+	oncreate() {
+		keyManager.registerShortcuts(this.shortcuts)
+	}
+
+	onremove() {
+		keyManager.unregisterShortcuts(this.shortcuts)
+	}
+
 	view(vnode: Vnode<ConversationViewerAttrs>): Children {
-		const itemsWithHeaders: Children[] = []
-		const viewModel = vnode.attrs.viewModel
-		if (this.didScroll && !isSameId(viewModel.mail._id, this.didScroll.mail)) {
-			this.didScroll = null
-		}
+		const { viewModel } = vnode.attrs
 		this.doScroll(viewModel)
-
-		const entries = viewModel.entries()
-		this.lastItems = entries
-		for (const entry of entries) {
-			switch (entry.type) {
-				case "mail": {
-					const mailViewModel = entry.viewModel
-					const isPrimary = mailViewModel === viewModel.primaryViewModel()
-
-					itemsWithHeaders.push(this.renderViewer(mailViewModel, isPrimary, viewModel))
-					break
-				}
-				case "subject": {
-					itemsWithHeaders.push(this.renderHeader(entry.subject, entry.id))
-					break
-				}
-				case "deleted": {
-					itemsWithHeaders.push(m(UnknownMailView, { key: getElementId(entry.entry) }))
-					break
-				}
-			}
-		}
+		this.lastItems = viewModel.entries()
 
 		return m(".fill-absolute.nav-bg", [
 			m(
@@ -66,7 +76,7 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 						console.log("remove container")
 					},
 				},
-				itemsWithHeaders,
+				this.renderItems(viewModel),
 				this.renderLoadingState(viewModel),
 				m(".mt-l", {
 					style: {
@@ -79,7 +89,25 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 		])
 	}
 
-	private renderLoadingState(viewModel: ConversationViewModel) {
+	private renderItems(viewModel: ConversationViewModel): Children {
+		return viewModel.entries().map((entry) => {
+			switch (entry.type) {
+				case "mail": {
+					const mailViewModel = entry.viewModel
+					const isPrimary = mailViewModel === viewModel.primaryViewModel()
+					return this.renderViewer(mailViewModel, isPrimary)
+				}
+				case "subject": {
+					return this.renderHeader(entry.subject, entry.id)
+				}
+				case "deleted": {
+					return m(UnknownMailView, { key: getElementId(entry.entry) })
+				}
+			}
+		})
+	}
+
+	private renderLoadingState(viewModel: ConversationViewModel): Children {
 		return viewModel.isConnectionLost()
 			? m(
 					".center",
@@ -102,11 +130,10 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 			: null
 	}
 
-	private renderFloatingHeader() {
+	private renderFloatingHeader(): Children {
 		return m(
 			".abs.nav-bg",
 			{
-				// class: mailViewerPadding(),
 				class: mailViewerMargin(),
 				style: {
 					top: 0,
@@ -130,7 +157,7 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 		)
 	}
 
-	private renderViewer(mailViewModel: MailViewerViewModel, isPrimary: boolean, viewModel: ConversationViewModel) {
+	private renderViewer(mailViewModel: MailViewerViewModel, isPrimary: boolean): Children {
 		return m(
 			".border-radius-big.overflow-hidden.mt-m",
 			{
@@ -139,11 +166,6 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 				oncreate: (vnode: VnodeDOM) => {
 					if (isPrimary) {
 						this.primaryDom = vnode.dom as HTMLElement
-					}
-				},
-				onremove: () => {
-					if (isPrimary) {
-						console.log("remove primary")
 					}
 				},
 				style: {
@@ -167,8 +189,7 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 		return m(ObservableSubject, {
 			subject: normalizedSubject,
 			id: id,
-			// FIXME
-			cb: (index, visiblity) => this.onSubjectVisible(id, visiblity),
+			cb: (visiblity) => this.onSubjectVisible(id, visiblity),
 			key: "item-subject" + normalizedSubject,
 		})
 	}
@@ -191,12 +212,12 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 				this.floatingSubjectDom.parentElement!.style.transform = `translateY(${px(-this.floatingSubjectDom.offsetHeight)})`
 			} else {
 				this.floatingSubjectDom.parentElement!.style.transform = ""
-				this.floatingSubjectDom.innerText = this.subjectForStickyHeader() ?? ""
+				this.floatingSubjectDom.innerText = this.subjectForFloatingHeader() ?? ""
 			}
 		}
 	}
 
-	private subjectForStickyHeader(): string | null {
+	private subjectForFloatingHeader(): string | null {
 		const entries = this.lastItems
 		if (!entries) return null
 		// knowingly N^2
@@ -214,7 +235,7 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 			if (mailIndex && mailIndex > 0) {
 				// If the item before the primary mail is a subject use that as a scroll target
 				const itemIndex = assertNotNull(viewModel.conversation)[mailIndex - 1].type === "subject" ? mailIndex - 1 : mailIndex
-				this.didScroll = { mail: viewModel.mail._id }
+				this.didScroll = true
 				requestAnimationFrame(() => {
 					const top = (containerDom.childNodes[itemIndex] as HTMLElement).offsetTop
 					// 46 for the floating header
@@ -223,13 +244,38 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 			}
 		}
 	}
+
+	private scrollUp(): void {
+		if (this.containerDom) {
+			this.containerDom.scrollBy({top: -this.containerDom.clientHeight * SCROLL_FACTOR, behavior: "smooth"})
+		}
+	}
+
+	private scrollDown(): void {
+		if (this.containerDom) {
+			this.containerDom.scrollBy({top: this.containerDom.clientHeight * SCROLL_FACTOR, behavior: "smooth"})
+		}
+	}
+
+	private scrollToTop(): void {
+		if (this.containerDom)  {
+			this.containerDom.scrollTo({top: 0, behavior: "smooth"})
+		}
+	}
+
+	private scrollToBottom(): void {
+		if (this.containerDom) {
+			this.containerDom?.scrollTo({top: this.containerDom.scrollHeight - this.containerDom.offsetHeight, behavior: "smooth"})
+		}
+	}
+
 }
 
 type SubjectVisiblity = "above" | "below" | "visible"
 
 interface ObservableSubjectAttrs {
 	id: string
-	cb: (id: string, visibility: SubjectVisiblity) => unknown
+	cb: (visibility: SubjectVisiblity) => unknown
 	subject: string
 }
 
@@ -259,7 +305,7 @@ class ObservableSubject implements Component<ObservableSubjectAttrs> {
 								: entry.boundingClientRect.bottom < assertNotNull(entry.rootBounds).top
 								? "above"
 								: "below"
-							this.lastAttrs.cb(this.lastAttrs.id, visibility)
+							this.lastAttrs.cb(visibility)
 						},
 						{ root: vnode.dom.parentElement },
 					)
@@ -267,7 +313,6 @@ class ObservableSubject implements Component<ObservableSubjectAttrs> {
 				},
 				onremove: (vnode) => {
 					this.observer?.unobserve(vnode.dom)
-					// this.lastAttrs.cb(this.lastAttrs.index, false)
 				},
 			},
 			this.lastAttrs.subject,
