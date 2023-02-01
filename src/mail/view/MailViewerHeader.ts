@@ -161,39 +161,35 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 				m(".flex", [
 					this.getRecipientEmailAddress(attrs),
 					m(".flex-grow"),
-					m(
-						".flex.items-center.white-space-pre.ml-s.ml-between-s",
-						{
-							// Orca refuses to read ut unless it's not focusable
-							tabindex: TabIndex.Default,
-							"aria-label": lang.get(viewModel.isConfidential() ? "confidential_action" : "nonConfidential_action") + ", " + dateTime,
-						},
-						[
-							viewModel.isConfidential()
-								? m(Icon, {
-										icon: Icons.Lock,
-										style: {
-											fill: theme.content_fg,
-										},
-										// flex makes svg inside centered and not randomly somewhere
-										class: "flex",
-								  })
-								: null,
-							icon
-								? m(Icon, {
-										icon,
-										container: "div",
-										style: {
-											fill: theme.content_button,
-										},
-								  })
-								: null,
-							m("small.date.content-fg.selectable", [
-								m("span.noprint", dateTime), // show the short date when viewing
-								m("span.noscreen", dateTimeFull), // show the date with year when printing
-							]),
-						],
-					),
+					m(".flex.items-center.white-space-pre.ml-s.ml-between-s", {
+						// Orca refuses to read ut unless it's not focusable
+						tabindex: TabIndex.Default,
+						"aria-label": lang.get(viewModel.isConfidential() ? "confidential_action" : "nonConfidential_action") + ", " + dateTime,
+					}),
+					m(".flex.ml-between-s.items-center", [
+						viewModel.isConfidential()
+							? m(Icon, {
+									icon: Icons.Lock,
+									container: "div",
+									style: {
+										fill: theme.content_button,
+									},
+							  })
+							: null,
+						icon
+							? m(Icon, {
+									icon,
+									container: "div",
+									style: {
+										fill: theme.content_button,
+									},
+							  })
+							: null,
+						m(".small.font-weight-600.selectable", { style: { color: theme.content_button } }, [
+							m(".noprint", dateTime), // show the short date when viewing
+							m(".noscreen", dateTimeFull), // show the date with year when printing
+						]),
+					]),
 				]),
 			],
 		)

@@ -155,9 +155,7 @@ export class ConversationViewModel {
 	 * returns -1 if mail isn't in conversation
 	 */
 	getConversationIndexByMailId(mailId: IdTuple) {
-		return this.conversation?.findIndex(
-			(e) => (e.type === "mail" && isSameId(e.viewModel.mail._id, mailId)) || (e.type === "deleted" && isSameId(e.entry._id, mailId)),
-		)
+		return this.conversation?.findIndex((e) => e.type === "mail" && isSameId(e.viewModel.mail._id, mailId))
 	}
 
 	entries(): ReadonlyArray<ConversationItem> {

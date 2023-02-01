@@ -35,7 +35,6 @@ export class MiniMailViewer implements Component<MiniMailViewerAttrs> {
 				m(".flex-grow"),
 				m(".flex.ml-between-s.items-center", [
 					mail.attachments.length > 0 ? this.renderIcon(Icons.Attachment) : null,
-					// FIXME the right folder
 					viewModel.isConfidential() ? this.renderIcon(Icons.Lock) : null,
 					folder ? this.renderIcon(getFolderIconByType(getMailFolderType(folder))) : null,
 					m(".small.font-weight-600", dateTime),
