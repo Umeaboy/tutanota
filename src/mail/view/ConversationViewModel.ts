@@ -18,9 +18,9 @@ export type ConversationItem = MailItem | SubjectItem | UnknownItem
 
 export class ConversationViewModel {
 	private readonly _primaryViewModel: MailViewerViewModel
-
 	private loadingState = new LoadingStateTracker()
 	private loadingPromise: Promise<void> | null = null
+	private conversation: ConversationItem[] | null = null
 
 	constructor(
 		private options: CreateMailViewerOptions,
@@ -94,8 +94,13 @@ export class ConversationViewModel {
 	}
 
 	private async processUpdateConversationEntry(update: EntityUpdateData) {
-		// FIXME for now
-		if (!this.conversation) return
+		try {
+			// first wait that we load the conversation, otherwise we might already have the email
+			await this.loadingPromise
+		} catch (e) {
+			return
+		}
+		const conversation = assertNotNull(this.conversation)
 		const ceId: IdTuple = [update.instanceListId, update.instanceId]
 		const conversationEntry = await this.entityClient.load(ConversationEntryTypeRef, ceId)
 		const mail =
@@ -103,13 +108,13 @@ export class ConversationViewModel {
 			conversationEntry.conversationType !== ConversationType.UNKNOWN && conversationEntry.mail
 				? await this.entityClient.load(MailTypeRef, conversationEntry.mail)
 				: null
-		const oldItemIndex = this.conversation.findIndex(
+		const oldItemIndex = conversation.findIndex(
 			(e) => (e.type === "mail" && isSameId(e.viewModel.mail.conversationEntry, ceId)) || (e.type === "deleted" && isSameId(e.entryId, ceId)),
 		)
 		if (oldItemIndex === -1) {
 			return
 		}
-		const oldItem = this.conversation[oldItemIndex]
+		const oldItem = conversation[oldItemIndex]
 		if (mail && oldItem.type === "mail" && haveSameId(oldItem.viewModel.mail, mail)) {
 			console.log("Noop entry update?", oldItem.viewModel.mail)
 			// nothing to do really, why do we get this update again?
@@ -118,13 +123,13 @@ export class ConversationViewModel {
 				oldItem.viewModel.dispose()
 			}
 			if (mail) {
-				this.conversation[oldItemIndex] = {
+				conversation[oldItemIndex] = {
 					type: "mail",
 					viewModel: this.viewModelFactory({ ...this.options, mail }),
 					entryId: conversationEntry._id,
 				}
 			} else {
-				this.conversation[oldItemIndex] = { type: "deleted", entryId: conversationEntry._id }
+				conversation[oldItemIndex] = { type: "deleted", entryId: conversationEntry._id }
 			}
 		}
 	}
@@ -132,8 +137,6 @@ export class ConversationViewModel {
 	private conversationListId() {
 		return listIdPart(this._primaryViewModel.mail.conversationEntry)
 	}
-
-	conversation: ConversationItem[] | null = null
 
 	private async loadConversation() {
 		try {
@@ -187,14 +190,6 @@ export class ConversationViewModel {
 		return allMails
 	}
 
-	/**
-	 * returns null if conversation doesn't exist
-	 * returns -1 if mail isn't in conversation
-	 */
-	getConversationIndexByMailId(mailId: IdTuple) {
-		return this.conversation?.findIndex((e) => e.type === "mail" && isSameId(e.viewModel.mail._id, mailId))
-	}
-
 	entries(): ReadonlyArray<ConversationItem> {
 		return (
 			this.conversation ?? [
@@ -232,7 +227,7 @@ export class ConversationViewModel {
 	}
 
 	private normalizeSubject(subject: string): string {
-		const match = subject.match(/^(?:(?:re|fwd):?\s*)*(.*)$/i)
+		const match = subject.match(/^(?:(?:re|fwd)(?::|\s)+)*(.*)$/i)
 		return match ? match[1] : ""
 	}
 

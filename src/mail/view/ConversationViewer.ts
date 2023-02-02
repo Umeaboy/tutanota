@@ -5,7 +5,7 @@ import { lang } from "../../misc/LanguageViewModel.js"
 import { theme } from "../../gui/theme.js"
 import { Button, ButtonType } from "../../gui/base/Button.js"
 import { assertNotNull } from "@tutao/tutanota-utils"
-import { elementIdPart } from "../../api/common/utils/EntityUtils.js"
+import { elementIdPart, isSameId } from "../../api/common/utils/EntityUtils.js"
 import { MiniMailViewer } from "./MiniMailViewer.js"
 import { mailViewerMargin } from "./MailViewerUtils.js"
 import { MailViewerViewModel } from "./MailViewerViewModel.js"
@@ -62,8 +62,8 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 
 	view(vnode: Vnode<ConversationViewerAttrs>): Children {
 		const { viewModel } = vnode.attrs
-		this.doScroll(viewModel)
 		this.lastItems = viewModel.entries()
+		this.doScroll(viewModel, this.lastItems)
 
 		return m(".fill-absolute.nav-bg", [
 			m(
@@ -225,22 +225,27 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 		return (entries[lastInvisibleSubject] as SubjectItem).subject
 	}
 
-	private doScroll(viewModel: ConversationViewModel) {
+	private doScroll(viewModel: ConversationViewModel, items: readonly ConversationItem[]) {
 		const primaryDom = this.primaryDom
 		const containerDom = this.containerDom
 		if (!this.didScroll && primaryDom && containerDom && viewModel.isFinished()) {
-			let mailIndex = viewModel.getConversationIndexByMailId(viewModel.mail._id)
+			const conversationId = viewModel.mail.conversationEntry
 
-			if (mailIndex && mailIndex > 0) {
-				// If the item before the primary mail is a subject use that as a scroll target
-				const itemIndex = assertNotNull(viewModel.conversation)[mailIndex - 1].type === "subject" ? mailIndex - 1 : mailIndex
-				this.didScroll = true
-				requestAnimationFrame(() => {
+			this.didScroll = true
+			requestAnimationFrame(() => {
+				// Find the index of the primary entry or of a subject before it
+				// there's a chance that item are not in sync with dom but it's very unlikely, this is the next frame after the last render we used the items
+				// and viewModel is finished.
+				// Alternatively we could query the dom directly for a primary/specific element.
+				const itemIndex = items.findIndex((e) => isSameId(e.entryId, conversationId))
+				// Don't scroll if it's already the first (or if we didn't find it but that would be weird)
+				if (itemIndex > 0) {
+					// There is a small chance that between finding the index and
 					const top = (containerDom.childNodes[itemIndex] as HTMLElement).offsetTop
 					// 46 for the floating header
 					containerDom.scrollTo({ top: top - 46 })
-				})
-			}
+				}
+			})
 		}
 	}
 
