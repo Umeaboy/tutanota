@@ -63,6 +63,7 @@ import { getAvailableDomains } from "./mailaddress/MailAddressesUtils.js"
 import { DrawerMenuAttrs } from "../gui/nav/DrawerMenu.js"
 import { BaseTopLevelView } from "../gui/BaseTopLevelView.js"
 import { TopLevelAttrs, TopLevelView } from "../TopLevelView.js"
+import { ReferralSettingsViewer } from "./ReferralSettingsViewer.js"
 
 assertMainOrNode()
 
@@ -122,6 +123,13 @@ export class SettingsView extends BaseTopLevelView implements TopLevelView<Setti
 				() => Icons.Palette,
 				"appearance",
 				() => new AppearanceSettingsViewer(),
+				undefined,
+			),
+			new SettingsFolder(
+				"referralSettings_label",
+				() => Icons.Palette, // TODO
+				"referral",
+				() => new ReferralSettingsViewer(),
 				undefined,
 			),
 		]

@@ -539,6 +539,9 @@ class MainLocator {
 						this.usageTestController,
 						this.userManagementFacade,
 					)
+				case "referralLink":
+					const { ReferralLinkNews } = await import("../../misc/news/items/ReferralLinkNews.js")
+					return new ReferralLinkNews(this.newsModel)
 				default:
 					console.log(`No implementation for news named '${name}'`)
 					return null

@@ -1575,3 +1575,6 @@ export type TranslationKeyType =
 	| "yourMessage_label"
 	| "you_label"
 	| "emptyString_msg"
+	| "referralSettings_label" // TODO
+	| "referralLink_label"
+	| "referralLinkShare_msg"

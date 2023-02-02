@@ -1092,12 +1092,18 @@ export async function writeInviteMail(mailboxDetails?: MailboxDetail) {
 	const detailsProperties = await getMailboxDetailsAndProperties(mailboxDetails)
 	const username = logins.getUserController().userGroupInfo.name
 	const body = lang.get("invitationMailBody_msg", {
-		"{registrationLink}": "https://mail.tutanota.com/signup",
+		"{registrationLink}": getReferralLink(),
 		"{username}": username,
 		"{githubLink}": "https://github.com/tutao/tutanota",
 	})
 	const dialog = await newMailEditorFromTemplate(detailsProperties.mailboxDetails, {}, lang.get("invitationMailSubject_msg"), body, [], false)
 	dialog.show()
+}
+
+export function getReferralLink(): string {
+	// TODO determine if using user ID is a good idea (i.e. privacy reasons such as multiple aliases)
+	const userId = logins.getUserController().userId
+	return `https://mail.tutanota.com/signup?referral=${userId}`
 }
 
 /**

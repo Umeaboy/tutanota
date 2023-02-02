@@ -679,7 +679,6 @@ export default {
 		"invalidTimePeriod_msg": "The entered time period is invalid.",
 		"invalidVatIdNumber_msg": "The value added tax identification number (VAT-ID) is invalid.",
 		"invalidVatIdValidationFailed_msg": "Failed to validate the value added tax identification number. Please try again later.",
-		"invitationMailBody_msg": "Hello!<br><br>This is my new email address. Tutanota offers a fully encrypted, ad-free mailbox to protect our right to privacy. With automatic encryption we can share emails as securely as sending sealed letters. Finally our data belongs only to us, no-one else can access it.<br><br>Join Tutanota now:<br>{registrationLink}<br><br><br>Best regards,<br>{username}<br><br>PS: Tutanota is free of charge with 1 GB of free storage included. In addition, it is open source: {githubLink}",
 		"invitationMailSubject_msg": "My new email address - join Tutanota so we can take back our privacy",
 		"invitation_label": "Invitation",
 		"invitedToEvent_msg": "You have been invited to take part in this event. Do you want to attend?",
@@ -1589,6 +1588,10 @@ export default {
 		"yourCalendars_label": "Your calendars",
 		"yourFolders_action": "YOUR FOLDERS",
 		"yourMessage_label": "Your message",
-		"you_label": "You"
+		"you_label": "You",
+		"referralSettings_label": "Refer a friend",
+		"referralLink_label": "Referral link",
+		"referralLinkShare_msg": "Join Tutanota now at: {referralLink}",
+		"invitationMailBody_msg": "Hello!<br><br>This is my email address. Tutanota offers fully encrypted, ad-free mailbox, calendar and contacts to protect our right to privacy. Finally, our data belongs only to us, no-one else can access it.<br><br>Join Tutanota now! If you use this link, we will both get a discount:<br>{registrationLink}<br><br><br>Best regards,<br>{username}<br><br>PS: Tutanota is free of charge with 1 GB of free storage included. In addition, it is open source: {githubLink}",
 	}
 }
