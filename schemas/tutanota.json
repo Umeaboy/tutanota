@@ -100,6 +100,16 @@
 					"info": "ChangeValueCardinality Mail/authStatus/ZeroOrOne."
 				}
 			]
+		},
+		{
+			"version": 60,
+			"changes": [
+				{
+					"name": "AddAssociation",
+					"sourceType": "MailboxGroupRoot",
+					"info": "AddAssociation MailboxGroupRoot/importImapAccountSyncState/ELEMENT_ASSOCIATION/1379."
+				}
+			]
 		}
 	]
 }
