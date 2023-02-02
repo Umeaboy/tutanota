@@ -159,7 +159,7 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 
 	private renderViewer(mailViewModel: MailViewerViewModel, isPrimary: boolean): Children {
 		return m(
-			".border-radius-big.overflow-hidden.mt-m",
+			".border-radius-big.mt-m",
 			{
 				class: mailViewerMargin(),
 				key: elementIdPart(mailViewModel.mail.conversationEntry),
@@ -247,28 +247,27 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 
 	private scrollUp(): void {
 		if (this.containerDom) {
-			this.containerDom.scrollBy({top: -this.containerDom.clientHeight * SCROLL_FACTOR, behavior: "smooth"})
+			this.containerDom.scrollBy({ top: -this.containerDom.clientHeight * SCROLL_FACTOR, behavior: "smooth" })
 		}
 	}
 
 	private scrollDown(): void {
 		if (this.containerDom) {
-			this.containerDom.scrollBy({top: this.containerDom.clientHeight * SCROLL_FACTOR, behavior: "smooth"})
+			this.containerDom.scrollBy({ top: this.containerDom.clientHeight * SCROLL_FACTOR, behavior: "smooth" })
 		}
 	}
 
 	private scrollToTop(): void {
-		if (this.containerDom)  {
-			this.containerDom.scrollTo({top: 0, behavior: "smooth"})
+		if (this.containerDom) {
+			this.containerDom.scrollTo({ top: 0, behavior: "smooth" })
 		}
 	}
 
 	private scrollToBottom(): void {
 		if (this.containerDom) {
-			this.containerDom?.scrollTo({top: this.containerDom.scrollHeight - this.containerDom.offsetHeight, behavior: "smooth"})
+			this.containerDom?.scrollTo({ top: this.containerDom.scrollHeight - this.containerDom.offsetHeight, behavior: "smooth" })
 		}
 	}
-
 }
 
 type SubjectVisiblity = "above" | "below" | "visible"

@@ -1681,7 +1681,6 @@ styles.registerStyle("main", () => {
 		},
 		".tooltip .tooltiptext": {
 			visibility: "hidden",
-			width: px(120),
 			"background-color": theme.content_button,
 			color: theme.content_bg,
 			"text-align": "center",
@@ -1691,7 +1690,6 @@ styles.registerStyle("main", () => {
 			"z-index": 1,
 			top: "150%",
 			left: "50%",
-			"margin-left": "-120px",
 		},
 		/* we're selecting every element that's after a summary tag and is inside an opened details tag */
 		"details[open] summary ~ *": {
@@ -1716,7 +1714,7 @@ styles.registerStyle("main", () => {
 			background: theme.content_bg,
 			color: theme.content_button,
 		},
-		".info-badge:hover .tooltiptext, .info-badge[expanded=true] .tooltiptext": {
+		".tooltip:hover .tooltiptext, .tooltip[expanded=true] .tooltiptext": {
 			visibility: "visible",
 		},
 		".ribbon-vertical": {

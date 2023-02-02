@@ -1,5 +1,5 @@
 import m, { Children, Component, Vnode } from "mithril"
-import { getFolderIconByType, getMailAddressDisplayText } from "../model/MailUtils.js"
+import { getFolderIconByType, getFolderName, getMailAddressDisplayText } from "../model/MailUtils.js"
 import { formatDateWithWeekday, formatTime } from "../../misc/Formatter.js"
 import { MailViewerViewModel } from "./MailViewerViewModel.js"
 import { theme } from "../../gui/theme.js"
@@ -36,20 +36,21 @@ export class MiniMailViewer implements Component<MiniMailViewerAttrs> {
 				m(".flex.ml-between-s.items-center", [
 					mail.attachments.length > 0 ? this.renderIcon(Icons.Attachment) : null,
 					viewModel.isConfidential() ? this.renderIcon(Icons.Lock) : null,
-					folder ? this.renderIcon(getFolderIconByType(getMailFolderType(folder))) : null,
+					folder ? this.renderIcon(getFolderIconByType(getMailFolderType(folder)), getFolderName(folder)) : null,
 					m(".small.font-weight-600", dateTime),
 				]),
 			],
 		)
 	}
 
-	private renderIcon(icon: AllIcons) {
+	private renderIcon(icon: AllIcons, hoverText: string | null = null) {
 		return m(Icon, {
 			icon,
 			container: "div",
 			style: {
 				fill: theme.content_button,
 			},
+			hoverText: hoverText,
 		})
 	}
 }

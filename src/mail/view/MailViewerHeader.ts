@@ -1,6 +1,6 @@
 import m, { Children, Component, Vnode } from "mithril"
 import { InfoLink, lang } from "../../misc/LanguageViewModel.js"
-import { getFolderIconByType, getMailAddressDisplayText, getSenderAddressDisplay, isTutanotaTeamMail } from "../model/MailUtils.js"
+import { getFolderIconByType, getFolderName, getMailAddressDisplayText, getSenderAddressDisplay, isTutanotaTeamMail } from "../model/MailUtils.js"
 import { theme } from "../../gui/theme.js"
 import { styles } from "../../gui/styles.js"
 import { ExpanderPanel } from "../../gui/base/Expander.js"
@@ -138,6 +138,7 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 	private renderAddressesAndDate(viewModel: MailViewerViewModel, attrs: MailViewerHeaderAttrs, dateTime: string, dateTimeFull: string) {
 		const folder = locator.mailModel.getMailFolder(viewModel.mail._id[0])
 		const icon = folder ? getFolderIconByType(getMailFolderType(folder)) : null
+		const folderName = folder ? getFolderName(folder) : null
 
 		return m(
 			".flex.mt-xs.click.col",
@@ -183,6 +184,7 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 									style: {
 										fill: theme.content_button,
 									},
+									hoverText: folderName,
 							  })
 							: null,
 						m(".small.font-weight-600.selectable", { style: { color: theme.content_button } }, [
@@ -237,16 +239,19 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 		// If the mail body failed to load, then we show a message in the main column
 		// If the mail body did load but not everything else, we show the message here
 		if (viewModel.isConnectionLost()) {
-			return m("." + mailViewerMargin(), m(InfoBanner, {
-				message: "mailPartsNotLoaded_msg",
-				icon: Icons.Warning,
-				buttons: [
-					{
-						label: "retry_action",
-						click: () => viewModel.loadAll(),
-					},
-				],
-			}))
+			return m(
+				"." + mailViewerMargin(),
+				m(InfoBanner, {
+					message: "mailPartsNotLoaded_msg",
+					icon: Icons.Warning,
+					buttons: [
+						{
+							label: "retry_action",
+							click: () => viewModel.loadAll(),
+						},
+					],
+				}),
+			)
 		} else {
 			return null
 		}
