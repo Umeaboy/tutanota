@@ -107,6 +107,7 @@ export class MailView extends BaseTopLevelView implements TopLevelView<MailViewA
 	set conversationViewModel(viewModel: ConversationViewModel | null) {
 		this.cache.conversationViewModel?.dispose()
 		this.cache.conversationViewModel = viewModel
+		viewModel?.init()
 	}
 
 	constructor(vnode: Vnode<MailViewAttrs>) {

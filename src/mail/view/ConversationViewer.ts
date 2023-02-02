@@ -5,7 +5,7 @@ import { lang } from "../../misc/LanguageViewModel.js"
 import { theme } from "../../gui/theme.js"
 import { Button, ButtonType } from "../../gui/base/Button.js"
 import { assertNotNull } from "@tutao/tutanota-utils"
-import { elementIdPart, getElementId } from "../../api/common/utils/EntityUtils.js"
+import { elementIdPart } from "../../api/common/utils/EntityUtils.js"
 import { MiniMailViewer } from "./MiniMailViewer.js"
 import { mailViewerMargin } from "./MailViewerUtils.js"
 import { MailViewerViewModel } from "./MailViewerViewModel.js"
@@ -101,7 +101,7 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 					return this.renderHeader(entry.subject, entry.id)
 				}
 				case "deleted": {
-					return m(UnknownMailView, { key: getElementId(entry.entry) })
+					return m(UnknownMailView, { key: elementIdPart(entry.entryId) })
 				}
 			}
 		})
@@ -141,8 +141,7 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 					right: 0,
 					borderBottom: `1px solid ${theme.list_border}`,
 					transition: `200ms ease-in-out`,
-					// FIXME: why 40?
-					transform: "translateY(-40px)",
+					transform: "translateY(-100%)",
 				},
 			},
 			m(

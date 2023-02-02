@@ -1,8 +1,8 @@
 import { ConversationEntry, ConversationEntryTypeRef, Mail, MailTypeRef } from "../../api/entities/tutanota/TypeRefs.js"
 import { MailViewerViewModel } from "./MailViewerViewModel.js"
 import { CreateMailViewerOptions } from "./MailViewer.js"
-import { elementIdPart, getElementId, haveSameId, isSameId, listIdPart } from "../../api/common/utils/EntityUtils.js"
-import { assertNotNull, findLast, groupBy } from "@tutao/tutanota-utils"
+import { elementIdPart, firstBiggerThanSecond, getElementId, haveSameId, isSameId, listIdPart } from "../../api/common/utils/EntityUtils.js"
+import { assertNotNull, findLast, findLastIndex, groupBy } from "@tutao/tutanota-utils"
 import { EntityClient } from "../../api/common/EntityClient.js"
 import { LoadingStateTracker } from "../../offline/LoadingState.js"
 import { EntityEventsListener, EntityUpdateData, EventController, isUpdateForTypeRef } from "../../api/main/EventController.js"
@@ -11,16 +11,16 @@ import { NotFoundError } from "../../api/common/error/RestError.js"
 
 export type MailViewerViewModelFactory = (options: CreateMailViewerOptions) => MailViewerViewModel
 
-export type MailItem = { type: "mail"; viewModel: MailViewerViewModel }
-export type SubjectItem = { type: "subject"; subject: string; id: string }
-export type UnknownItem = { type: "deleted"; entry: ConversationEntry }
+export type MailItem = { type: "mail"; viewModel: MailViewerViewModel; entryId: IdTuple }
+export type SubjectItem = { type: "subject"; subject: string; id: string; entryId: IdTuple }
+export type UnknownItem = { type: "deleted"; entryId: IdTuple }
 export type ConversationItem = MailItem | SubjectItem | UnknownItem
 
 export class ConversationViewModel {
 	private readonly _primaryViewModel: MailViewerViewModel
 
 	private loadingState = new LoadingStateTracker()
-	private loadingPromise: Promise<void>
+	private loadingPromise: Promise<void> | null = null
 
 	constructor(
 		private options: CreateMailViewerOptions,
@@ -30,7 +30,9 @@ export class ConversationViewModel {
 		private readonly onUiUpdate: () => unknown,
 	) {
 		this._primaryViewModel = viewModelFactory(options)
-		// FIXME: shouldn't do it in constructor
+	}
+
+	init() {
 		this.loadingPromise = this.loadingState.trackPromise(this.loadConversation())
 		this.eventController.addEntityListener(this.onEntityEvent)
 	}
@@ -54,36 +56,39 @@ export class ConversationViewModel {
 	}
 
 	private async processCreateConversationEntry(update: EntityUpdateData) {
-		// FIXME this is very WIP, no error handling, many assumptions
 		const id: IdTuple = [update.instanceListId, update.instanceId]
-		const entry = await this.entityClient.load(ConversationEntryTypeRef, id)
-		if (entry.mail) {
-			try {
-				// first wait that we load the conversation, otherwise we might already have the email
-				await this.loadingPromise
-			} catch (e) {
-				return
-			}
-			const conversation = assertNotNull(this.conversation)
-			if (conversation.some((item) => item.type === "mail" && isSameId(item.viewModel.mail.conversationEntry, id))) {
-				// already loaded
-				return
-			}
-			// FIXME: find the position for it
-			try {
+		try {
+			const entry = await this.entityClient.load(ConversationEntryTypeRef, id)
+			if (entry.mail) {
+				try {
+					// first wait that we load the conversation, otherwise we might already have the email
+					await this.loadingPromise
+				} catch (e) {
+					return
+				}
+				const conversation = assertNotNull(this.conversation)
+				if (conversation.some((item) => item.type === "mail" && isSameId(item.viewModel.mail.conversationEntry, id))) {
+					// already loaded
+					return
+				}
 				const mail = await this.entityClient.load(MailTypeRef, entry.mail)
 				const newSubject = this.normalizeSubject(mail.subject)
+				let index = findLastIndex(conversation, (i) => firstBiggerThanSecond(getElementId(entry), elementIdPart(i.entryId)))
+				if (index < 0) {
+					index = conversation.length
+				}
 				const lastSubject = findLast(conversation, (c) => c.type === "subject") as SubjectItem | null
 				if (newSubject !== lastSubject?.subject) {
-					conversation.push({ type: "subject", subject: newSubject, id: getElementId(mail) })
+					conversation.splice(index + 1, 0, { type: "subject", subject: newSubject, id: getElementId(mail), entryId: entry._id })
+					index += 1
 				}
-				conversation.push({ type: "mail", viewModel: this.viewModelFactory({ ...this.options, mail }) })
+				conversation.splice(index + 1, 0, { type: "mail", viewModel: this.viewModelFactory({ ...this.options, mail }), entryId: entry._id })
 				this.onUiUpdate()
-			} catch (e) {
-				if (e instanceof NotFoundError) {
-				} else {
-					throw e
-				}
+			}
+		} catch (e) {
+			if (e instanceof NotFoundError) {
+			} else {
+				throw e
 			}
 		}
 	}
@@ -99,7 +104,7 @@ export class ConversationViewModel {
 				? await this.entityClient.load(MailTypeRef, conversationEntry.mail)
 				: null
 		const oldItemIndex = this.conversation.findIndex(
-			(e) => (e.type === "mail" && isSameId(e.viewModel.mail.conversationEntry, ceId)) || (e.type === "deleted" && isSameId(e.entry._id, ceId)),
+			(e) => (e.type === "mail" && isSameId(e.viewModel.mail.conversationEntry, ceId)) || (e.type === "deleted" && isSameId(e.entryId, ceId)),
 		)
 		if (oldItemIndex === -1) {
 			return
@@ -116,9 +121,10 @@ export class ConversationViewModel {
 				this.conversation[oldItemIndex] = {
 					type: "mail",
 					viewModel: this.viewModelFactory({ ...this.options, mail }),
+					entryId: conversationEntry._id,
 				}
 			} else {
-				this.conversation[oldItemIndex] = { type: "deleted", entry: conversationEntry }
+				this.conversation[oldItemIndex] = { type: "deleted", entryId: conversationEntry._id }
 			}
 		}
 	}
@@ -149,15 +155,16 @@ export class ConversationViewModel {
 				const subject = this.normalizeSubject(mail.subject)
 				if (subject !== previousSubject) {
 					previousSubject = subject
-					newConversation.push({ type: "subject", subject: subject, id: getElementId(mail) })
+					newConversation.push({ type: "subject", subject: subject, id: getElementId(mail), entryId: c._id })
 				}
 
 				newConversation.push({
 					type: "mail",
 					viewModel: isSameId(mail._id, this.options.mail._id) ? this._primaryViewModel : this.viewModelFactory({ ...this.options, mail }),
+					entryId: c._id,
 				})
 			} else {
-				newConversation.push({ type: "deleted", entry: c })
+				newConversation.push({ type: "deleted", entryId: c._id })
 			}
 		}
 		return newConversation
@@ -191,8 +198,13 @@ export class ConversationViewModel {
 	entries(): ReadonlyArray<ConversationItem> {
 		return (
 			this.conversation ?? [
-				{ type: "subject", subject: this.normalizeSubject(this._primaryViewModel.mail.subject), id: getElementId(this._primaryViewModel.mail) },
-				{ type: "mail", viewModel: this._primaryViewModel },
+				{
+					type: "subject",
+					subject: this.normalizeSubject(this._primaryViewModel.mail.subject),
+					id: getElementId(this._primaryViewModel.mail),
+					entryId: this._primaryViewModel.mail.conversationEntry,
+				},
+				{ type: "mail", viewModel: this._primaryViewModel, entryId: this._primaryViewModel.mail.conversationEntry },
 			]
 		)
 	}
