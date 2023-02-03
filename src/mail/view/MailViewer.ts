@@ -28,8 +28,6 @@ import { getListId } from "../../api/common/utils/EntityUtils"
 import { createEmailSenderListElement } from "../../api/entities/sys/TypeRefs.js"
 import { UserError } from "../../api/main/UserError"
 import { showUserError } from "../../misc/ErrorHandlerImpl"
-import { animations, DomMutation, scroll } from "../../gui/animation/Animations"
-import { ease } from "../../gui/animation/Easing"
 import { isNewMailActionAvailable } from "../../gui/nav/NavFunctions"
 import { CancelledError } from "../../api/common/error/CancelledError"
 import { MailViewerHeader } from "./MailViewerHeader.js"
@@ -135,7 +133,7 @@ export class MailViewer implements Component<MailViewerAttrs> {
 			this.isScaling = true
 			this.lastContentBlockingStatus = null
 			if (isPrimary) {
-				this.viewModel.loadAll()
+				this.viewModel.expandMail()
 			}
 			this.delayProgressSpinner = true
 			setTimeout(() => {

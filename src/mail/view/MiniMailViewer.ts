@@ -27,8 +27,7 @@ export class MiniMailViewer implements Component<MiniMailViewerAttrs> {
 				style: {
 					color: theme.content_button,
 				},
-				// FIXME: is correct?
-				onclick: () => viewModel.loadAll({ notify: true }),
+				onclick: () => viewModel.expandMail(),
 			},
 			[
 				m(".font-weight-600", getMailAddressDisplayText(mail.sender.name, mail.sender.address, true)),

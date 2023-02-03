@@ -62,7 +62,7 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 
 		if (styles.isSingleColumnLayout()) {
 			return m(".header.mlr-safe-inset", [
-				this.renderNarrowSenderAction(attrs),
+				this.renderSubjectActionsLine(attrs),
 				this.renderFolderText(viewModel),
 				this.renderAddressesAndDate(viewModel, attrs, dateTime, dateTimeFull),
 				m(
@@ -99,11 +99,21 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 
 	private renderNarrowSenderAction({ viewModel, isPrimary }: MailViewerHeaderAttrs) {
 		return m(".flex.mt-xs.mlr", [
-			m(".flex.flex-wrap.items-end", [
-				this.tutaoBadge(viewModel),
-				m("span.text-break" + (isPrimary ? ".font-weight-600" : ""), viewModel.mail.sender.name),
-			]),
-			m(".flex-grow"),
+			m(
+				".flex.flex-grow.flex-wrap.items-end",
+				{
+					role: "button",
+					onclick: () => {
+						isPrimary ? noOp : viewModel.collapseMail()
+					},
+					onkeydown: (e: KeyboardEvent) => {
+						if (isKeyPressed(e.keyCode, Keys.SPACE, Keys.RETURN)) {
+							isPrimary ? noOp : viewModel.collapseMail()
+						}
+					},
+				},
+				[this.tutaoBadge(viewModel), m("span.text-break" + (isPrimary ? ".font-weight-600" : ""), viewModel.mail.sender.name)],
+			),
 			// FIXME I wanna be a real button!
 			m(IconButton, {
 				title: "more_label",
@@ -199,11 +209,28 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 
 	private renderSubjectActionsLine(attrs: MailViewerHeaderAttrs) {
 		const { viewModel } = attrs
-		return m(".flex.items-start.pl-l", [
-			m(".flex.flex-wrap.items-start.mt", [
-				this.tutaoBadge(viewModel),
-				m("span.text-break" + (attrs.isPrimary ? ".font-weight-600" : ""), viewModel.mail.sender.name),
-			]),
+		let classes = ".flex"
+		if (styles.isSingleColumnLayout()) {
+			classes += ".mt-xs.mlr"
+		} else {
+			classes += ".pl-l"
+		}
+		return m(classes, [
+			m(
+				".flex.flex-grow.flex-wrap.items-start.click.mt",
+				{
+					role: "button",
+					onclick: () => {
+						attrs.isPrimary ? noOp : viewModel.collapseMail()
+					},
+					onkeydown: (e: KeyboardEvent) => {
+						if (isKeyPressed(e.keyCode, Keys.SPACE, Keys.RETURN)) {
+							attrs.isPrimary ? noOp : viewModel.collapseMail()
+						}
+					},
+				},
+				[this.tutaoBadge(viewModel), m("span.text-break" + (attrs.isPrimary ? ".font-weight-600" : ""), viewModel.mail.sender.name)],
+			),
 			this.actionButtons(attrs),
 		])
 	}
@@ -676,7 +703,7 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 	private actionButtons(attrs: MailViewerHeaderAttrs): Children {
 		const { viewModel } = attrs
 		let actions: Children
-		if (!attrs.isPrimary) {
+		if (styles.isSingleColumnLayout() || !attrs.isPrimary) {
 			actions = [
 				// FIXME: all actions there
 				this.moreButton(attrs),
@@ -701,7 +728,7 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 		}
 
 		return m(
-			".action-bar.flex-end.items-center.ml-between-s.mt-xs",
+			".flex-end.items-center.ml-between-s.mt-xs",
 			{
 				style: {
 					marginRight: "6px",

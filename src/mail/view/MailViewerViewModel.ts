@@ -114,6 +114,8 @@ export class MailViewerViewModel {
 
 	private loading: Promise<void> = Promise.resolve()
 
+	private collapsed: boolean = true
+
 	get mail(): Mail {
 		return this._mail
 	}
@@ -1026,7 +1028,16 @@ export class MailViewerViewModel {
 	}
 
 	isCollapsed(): boolean {
-		return this.getSanitizedMailBody() == null && !this.isLoading() && !this.isConnectionLost()
+		return this.collapsed
+	}
+
+	expandMail(): void {
+		this.loadAll({ notify: true })
+		this.collapsed = false
+	}
+
+	collapseMail(): void {
+		this.collapsed = true
 	}
 
 	async getAssignmentGroupInfos(): Promise<GroupInfo[]> {
