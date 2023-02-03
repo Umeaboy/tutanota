@@ -76,6 +76,7 @@ import { DialogInjectionRightAttrs } from "../../gui/base/DialogInjectionRight.j
 import { KnowledgebaseDialogContentAttrs } from "../../knowledgebase/view/KnowledgeBaseDialogContent.js"
 import { MailWrapper } from "../../api/common/MailWrapper.js"
 import { RecipientsSearchModel } from "../../misc/RecipientsSearchModel.js"
+import { getReferralLink } from "../../settings/ReferralViewModel.js"
 
 export type MailEditorAttrs = {
 	model: SendMailModel
@@ -1098,12 +1099,6 @@ export async function writeInviteMail(mailboxDetails?: MailboxDetail) {
 	})
 	const dialog = await newMailEditorFromTemplate(detailsProperties.mailboxDetails, {}, lang.get("invitationMailSubject_msg"), body, [], false)
 	dialog.show()
-}
-
-export function getReferralLink(): string {
-	// TODO determine if using user ID is a good idea (i.e. privacy reasons such as multiple aliases)
-	const userId = logins.getUserController().userId
-	return `https://mail.tutanota.com/signup?referral=${userId}`
 }
 
 /**

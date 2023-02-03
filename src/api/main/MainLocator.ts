@@ -13,7 +13,7 @@ import { EntityClient } from "../common/EntityClient"
 import type { CalendarModel } from "../../calendar/model/CalendarModel"
 import { CalendarInfo, CalendarModelImpl } from "../../calendar/model/CalendarModel"
 import type { DeferredObject } from "@tutao/tutanota-utils"
-import { defer, lazyMemoized } from "@tutao/tutanota-utils"
+import { DAY_IN_MILLIS, defer, getDayShifted, lazyMemoized } from "@tutao/tutanota-utils"
 import { ProgressTracker } from "./ProgressTracker"
 import { MinimizedMailEditorViewModel } from "../../mail/model/MinimizedMailEditorViewModel"
 import { SchedulerImpl } from "../common/utils/Scheduler.js"
@@ -92,6 +92,7 @@ import { CalendarViewModel } from "../../calendar/view/CalendarViewModel.js"
 import { ReceivedGroupInvitationsModel } from "../../sharing/model/ReceivedGroupInvitationsModel.js"
 import { GroupType } from "../common/TutanotaConstants.js"
 import { ExternalLoginViewModel } from "../../login/ExternalLoginView.js"
+import { showReferralNews } from "../../settings/ReferralViewModel.js"
 
 assertMainOrNode()
 
@@ -540,8 +541,9 @@ class MainLocator {
 						this.userManagementFacade,
 					)
 				case "referralLink":
-					const { ReferralLinkNews } = await import("../../misc/news/items/ReferralLinkNews.js")
-					return new ReferralLinkNews(this.newsModel)
+					const customerInfo = await logins.getUserController().loadCustomerInfo()
+					const dateProvider = await this.noZoneDateProvider()
+					return await showReferralNews(dateProvider, customerInfo, this.newsModel)
 				default:
 					console.log(`No implementation for news named '${name}'`)
 					return null
