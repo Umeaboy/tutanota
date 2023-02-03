@@ -704,10 +704,7 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 		const { viewModel } = attrs
 		let actions: Children
 		if (styles.isSingleColumnLayout() || !attrs.isPrimary) {
-			actions = [
-				// FIXME: all actions there
-				this.moreButton(attrs),
-			]
+			actions = [this.moreButton(attrs)]
 		} else if (viewModel.isAnnouncement()) {
 			actions = [this.deleteButton(attrs), this.moreButton(attrs)]
 		} else if (viewModel.isDraftMail()) {
@@ -828,16 +825,44 @@ export class MailViewerHeader implements Component<MailViewerHeaderAttrs> {
 	private prepareMoreActions({ viewModel, isPrimary }: MailViewerHeaderAttrs) {
 		return createDropdown({
 			lazyButtons: () => [
-				// FIXME temporary hack, should actually add them in utils conditionally
-				...(isPrimary
+				...(isPrimary && !styles.isSingleColumnLayout()
 					? []
-					: [
+					: ([
+							...(viewModel.canForwardOrMove()
+								? ([
+										{
+											label: "reply_action",
+											click: () => viewModel.reply(false),
+											icon: Icons.Reply,
+										},
+										...(viewModel.canReplyAll()
+											? ([
+													{
+														label: "replyAll_action",
+														click: () => viewModel.reply(true),
+														icon: Icons.ReplyAll,
+													},
+											  ] as const)
+											: []),
+										{
+											label: "forward_action",
+											click: () => viewModel.forward(),
+											icon: Icons.Forward,
+										},
+										{
+											label: "move_action",
+											click: (_: MouseEvent, dom: HTMLElement) =>
+												showMoveMailsDropdown(viewModel.mailModel, dom.getBoundingClientRect(), [viewModel.mail]),
+											icon: Icons.Folder,
+										},
+								  ] as const)
+								: []),
 							{
 								label: "delete_action",
 								click: () => promptAndDeleteMails(viewModel.mailModel, [viewModel.mail], noOp),
 								icon: Icons.Trash,
-							} as DropdownButtonAttrs,
-					  ]),
+							},
+					  ] as const)),
 				...mailViewerMoreActions(viewModel),
 			],
 			width: 300,
