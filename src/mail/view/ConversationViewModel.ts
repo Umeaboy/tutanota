@@ -13,8 +13,8 @@ export type MailViewerViewModelFactory = (options: CreateMailViewerOptions) => M
 
 export type MailItem = { type: "mail"; viewModel: MailViewerViewModel; entryId: IdTuple }
 export type SubjectItem = { type: "subject"; subject: string; id: string; entryId: IdTuple }
-export type UnknownItem = { type: "deleted"; entryId: IdTuple }
-export type ConversationItem = MailItem | SubjectItem | UnknownItem
+export type DeletedItem = { type: "deleted"; entryId: IdTuple }
+export type ConversationItem = MailItem | SubjectItem | DeletedItem
 
 export class ConversationViewModel {
 	private readonly _primaryViewModel: MailViewerViewModel
@@ -129,7 +129,8 @@ export class ConversationViewModel {
 					entryId: conversationEntry._id,
 				}
 			} else {
-				conversation[oldItemIndex] = { type: "deleted", entryId: conversationEntry._id }
+				// When DELETED conversation status type is added, replace entry with deleted entry instead of splicing out
+				conversation.splice(oldItemIndex, 1)
 			}
 		}
 	}
@@ -166,9 +167,8 @@ export class ConversationViewModel {
 					viewModel: isSameId(mail._id, this.options.mail._id) ? this._primaryViewModel : this.viewModelFactory({ ...this.options, mail }),
 					entryId: c._id,
 				})
-			} else {
-				newConversation.push({ type: "deleted", entryId: c._id })
 			}
+			// add newConversation.push({ type: "deleted", entryId: c._id }) when we have DELETED conversation entry status
 		}
 		return newConversation
 	}

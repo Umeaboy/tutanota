@@ -20,6 +20,9 @@ export interface ConversationViewerAttrs {
 
 const SCROLL_FACTOR = 4 / 5
 
+/**
+ * Displays mails in a conversation
+ */
 export class ConversationViewer implements Component<ConversationViewerAttrs> {
 	private primaryDom: HTMLElement | null = null
 	private containerDom: HTMLElement | null = null
@@ -76,7 +79,7 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 						console.log("remove container")
 					},
 				},
-				this.renderItems(viewModel),
+				this.renderItems(viewModel, this.lastItems),
 				this.renderLoadingState(viewModel),
 				m(".mt-l", {
 					style: {
@@ -89,8 +92,8 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 		])
 	}
 
-	private renderItems(viewModel: ConversationViewModel): Children {
-		return viewModel.entries().map((entry) => {
+	private renderItems(viewModel: ConversationViewModel, entries: readonly ConversationItem[]): Children {
+		return entries.map((entry) => {
 			switch (entry.type) {
 				case "mail": {
 					const mailViewModel = entry.viewModel
@@ -101,7 +104,7 @@ export class ConversationViewer implements Component<ConversationViewerAttrs> {
 					return this.renderHeader(entry.subject, entry.id)
 				}
 				case "deleted": {
-					return m(UnknownMailView, { key: elementIdPart(entry.entryId) })
+					return m(DeletedMailView, { key: elementIdPart(entry.entryId) })
 				}
 			}
 		})
@@ -323,7 +326,7 @@ class ObservableSubject implements Component<ObservableSubjectAttrs> {
 	}
 }
 
-class UnknownMailView implements Component {
+class DeletedMailView implements Component {
 	view() {
 		return m(
 			".center.pt-s.pb-s.font-weight-600.border-radius-big.mt-m",
@@ -334,8 +337,7 @@ class UnknownMailView implements Component {
 					color: theme.content_button,
 				},
 			},
-			// FIXME: placeholder for now
-			"Unknown email",
+			"Deleted Email",
 		)
 	}
 }
